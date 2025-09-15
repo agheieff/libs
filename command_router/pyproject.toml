@@ -3,12 +3,11 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cli-loop"
+name = "command-router"
 version = "0.1.0"
 description = "Zero-dep micro CLI loop engine"
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = ["command-router @ file:./command_router"]
 
 [project.urls]
-Home = "https://github.com/agheieff/cli-loop"
+Home = "https://github.com/agheieff/libs/command-router"

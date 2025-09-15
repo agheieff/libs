@@ -1,76 +1,46 @@
+# telegram_loop.py
 from __future__ import annotations
-import sys
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+import asyncio
+from command_router import Router, Caller, command
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-@dataclass
-class Command:
-    name: str
-    fn: Callable[[str, "CLI"], None]
-    help: str = ""
+class TelegramCaller(Caller):
+    """Caller implementation that talks to Telegram."""
+    __slots__ = ("chat_id", "context")
+    def __init__(self, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+        self.chat_id = chat_id
+        self.context = context
+    async def send(self, text: str) -> None:
+        await self.context.bot.send_message(chat_id=self.chat_id, text=text)
 
-class CLI:
-    """Delimiter-based command loop.  Auto-registers help & quit."""
-    def __init__(self, delim: str = "/", prompt: str = "> "):
-        self.delim: str = delim
-        self.prompt: str = prompt
-        self.cmds: Dict[str, Command] = {}
-        self._register_builtin()
+class TelegramBot(Router):
+    """Thin Router-based Telegram bot."""
+    def __init__(self, token: str, delim: str = "/"):
+        super().__init__(delim)
+        self.token = token
 
-    # ----- built-ins -----
-    def _register_builtin(self) -> None:
-        self.register(self._help, "help", "Show this help")
-        self.register(self._quit, "quit", "Exit")
-        self.register(self._quit, "exit", "")
+    # ---------- internal ----------
+    async def _route(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not update.message or not update.message.text:
+            return
+        caller = TelegramCaller(update.message.chat_id, context)
+        try:
+            # Router expects a sync handle(); we run it in the default executor.
+            await asyncio.get_running_loop().run_in_executor(
+                None, self.handle, update.message.text, caller
+            )
+        except KeyboardInterrupt:          # raised by /quit
+            await caller.send("Good-bye.")
+            # stop the entire application
+            asyncio.create_task(context.application.stop())
 
-    def _help(self, args: str, cli: CLI) -> None:
-        print("Commands:")
-        for c in self.cmds.values():
-            print(f"  {cli.delim}{c.name:<12} {c.help}")
+    # ---------- public ----------
+    def run(self) -> None:
+        app = Application.builder().token(self.token).build()
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._route))
+        app.run_polling()
 
-    def _quit(self, args: str, cli: CLI) -> None:
-        raise KeyboardInterrupt
-
-    # ----- public API -----
-    def register(
-        self,
-        fn: Callable[[str, "CLI"], None],
-        name: Optional[str] = None,
-        help: str = "",
-    ) -> None:
-        """Register a function as a command."""
-        name = name or fn.__name__.lstrip("handle_")
-        self.cmds[name] = Command(name, fn, help)
-
-    def run(self, on_text: Optional[Callable[[str, "CLI"], None]] = None) -> None:
-        while True:
-            try:
-                raw = input(self.prompt).strip()
-            except (KeyboardInterrupt, EOFError):
-                break
-            if not raw:
-                continue
-            if raw.startswith(self.delim):
-                cmd_raw, _, args = raw[1:].partition(" ")
-                try:
-                    if cmd := self.cmds.get(cmd_raw):
-                        cmd.fn(args, self)
-                    else:
-                        print(f"Unknown command – {self.delim}help")
-                except KeyboardInterrupt:
-                    break
-                continue
-            if on_text:
-                try:
-                    on_text(raw, self)
-                except KeyboardInterrupt:
-                    break
-        print("\nBye.")
-
-# convenience decorator
-def command(name: Optional[str] = None, help: str = ""):
-    def decorator(fn: Callable[[str, "CLI"], None]) -> Callable[[str, "CLI"], None]:
-        fn._cli_name = name
-        fn._cli_help = help
-        return fn
-    return decorator
+# re-export decorator so user code stays identical
+from command_router import command
+__all__ = ["TelegramBot", "command"]

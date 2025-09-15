@@ -3,15 +3,15 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "telegram"
+name = "telegram_bot"
 version = "0.1.0"
 description = "Router-based Telegram bot micro-library"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "command-router>=0.1.0",
-    "python-telegram-bot>=20.0",
+	"python-telegram-bot>=20.0",
+	"command-router @ file:./command_router"
 ]
 
 [project.urls]
-Home = "https://github.com/agheieff/libs/telegram"
+Home = "https://github.com/agheieff/libs/telegram_bot"

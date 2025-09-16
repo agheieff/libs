@@ -1,3 +1,3 @@
-from .client import get_response, get_streaming_response
+from .openrouter import complete, astream, consume_and_drop
 
-__all__ = ["get_response", "get_streaming_response"]
+__all__ = ["complete", "astream", "consume_and_drop"]

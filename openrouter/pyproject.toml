@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "OpenRouter client"
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = ["requests>=2.25"]
+dependencies = ["httpx>=0.20.0"]
 
 [project.urls]
-Homepage = "https://github.com/yourname/my-dev-utils"
+Homepage = "https://github.com/agheieff/libs/openrouter"

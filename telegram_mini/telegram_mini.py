@@ -116,19 +116,25 @@ class TelegramBot:
         bot = TelegramBot.start("YOUR_BOT_TOKEN", skip_history=False, offset_file="bot_offset.txt")
         bot.run(message_handler)
     """
-    def __init__(self, token: str, commands: Optional[dict[str, str]] = None, 
+    def __init__(self, token: str, commands: Optional[dict[str, str]] = None,
                  skip_history: bool = True, offset_file: Optional[str] = None):
         self.token = token
         self.url = f"https://api.telegram.org/bot{token}/"
-        self._off = self._load_offset(offset_file) if offset_file and not skip_history else 0
         self._sess = requests.Session()
         self._cmds = commands
         self._history_skipped = False
-        self._offset_file = offset_file if not skip_history else None
-        
-        # Skip historical messages if requested
+
+        # Handle offset and skip_history logic
         if skip_history:
+            # When skipping history, we don't use offset_file for persistence
+            self._offset_file = None
+            # Initialize offset to 0 temporarily, will be updated by _skip_historical_updates
+            self._off = 0
             self._skip_historical_updates()
+        else:
+            # When not skipping history, use offset_file if provided
+            self._offset_file = offset_file
+            self._off = self._load_offset(offset_file) if offset_file else 0
 
     # ------------------ public high-level API ------------------
     @classmethod
@@ -136,12 +142,13 @@ class TelegramBot:
               skip_history: bool = True, offset_file: Optional[str] = None) -> "TelegramBot":
         return cls(token, commands, skip_history, offset_file)
 
-    def run(self, handler: Callable[[Event], None], skip_history: bool = True) -> None:
+    def run(self, handler: Callable[[Event], None], skip_history: Optional[bool] = None) -> None:
         """Run the bot in the main thread (blocking)."""
-        # Skip historical messages if requested (alternative to constructor parameter)
-        if skip_history and not self._history_skipped:
-            self._skip_historical_updates()
-        
+        # Skip historical messages if requested (override constructor parameter)
+        if skip_history is not None:
+            if skip_history and not self._history_skipped:
+                self._skip_historical_updates()
+
         if self._cmds:
             table = [type('C', (), {'name': k, 'help': v})
                      for k, v in self._cmds.items()]
@@ -212,10 +219,20 @@ class TelegramBot:
         self._post("setMyCommands", payload)
 
     def _skip_historical_updates(self) -> None:
-        """Skip all historical updates by making a request with a high offset."""
-        # Make a call with a high offset to mark all previous updates as confirmed
-        # without actually processing them
-        self._post("getUpdates", {"offset": 999999999, "timeout": 1})
+        """Skip all historical updates by getting the latest update_id and setting offset accordingly."""
+        # Get the latest update to determine the current update_id
+        updates = self._post("getUpdates", {"offset": -1, "limit": 1, "timeout": 1})
+
+        if updates:
+            # Set offset to the latest update_id + 1 to skip all historical messages
+            latest_update_id = updates[0]["update_id"]
+            self._off = latest_update_id + 1
+            # Save the offset if we have an offset file configured
+            self._save_offset()
+        else:
+            # No updates available, start from 0 (but this should be rare)
+            self._off = 0
+
         # Set a flag to indicate we've already skipped history
         self._history_skipped = True
 

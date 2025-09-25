@@ -1,3 +1,3 @@
-from .openrouter import complete, astream, consume_and_drop
+from .openrouter import complete, astream, consume_and_drop, StreamController
 
-__all__ = ["complete", "astream", "consume_and_drop"]
+__all__ = ["complete", "astream", "consume_and_drop", "StreamController"]

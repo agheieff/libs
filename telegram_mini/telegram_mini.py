@@ -43,6 +43,18 @@ class Event:
 
         self.type, self.command, self.args = "text", "", ""
 
+    def get_voice_file_id(self) -> Optional[str]:
+        """Get file_id for voice messages, or None if not a voice message."""
+        if self.type == "voice":
+            return self.raw["message"]["voice"]["file_id"]
+        return None
+
+    def get_audio_file_id(self) -> Optional[str]:
+        """Get file_id for audio messages, or None if not an audio message."""
+        if self.type == "audio":
+            return self.raw["message"]["audio"]["file_id"]
+        return None
+
 
 SplitterFn = Callable[[str, int], Tuple[str, int]]
 """Return (visible_part, cut_pos) where cut_pos is the byte index **after** the split.
@@ -261,6 +273,32 @@ class TelegramBot:
                 self.send(chat_id, message)
             except Exception as e:
                 logger.warning(f"Failed to send to chat {chat_id}: {e}")
+
+    def download_file(self, file_id: str) -> bytes:
+        """
+        Download a file from Telegram by file_id.
+
+        Args:
+            file_id: Telegram file ID
+
+        Returns:
+            File contents as bytes
+        """
+        # Get file path
+        file_info = self._post("getFile", {"file_id": file_id})
+        if not file_info:
+            raise RuntimeError(f"Failed to get file info for {file_id}")
+
+        file_path = file_info.get("file_path")
+        if not file_path:
+            raise RuntimeError(f"No file_path in response for {file_id}")
+
+        # Download file
+        file_url = f"https://api.telegram.org/file/bot{self.token}/{file_path}"
+        response = self._sess.get(file_url, timeout=30)
+        response.raise_for_status()
+
+        return response.content
 
     # ------------------ internal ------------------
     @staticmethod

@@ -4,7 +4,8 @@ import re
 import requests
 import threading
 import time
-from typing import Callable, Optional, Tuple
+import asyncio
+from typing import Callable, Optional, Tuple, Set, Awaitable
 
 logger = logging.getLogger(__name__)
 CMD_RE = re.compile(r'^/\w+(@\w+)?(\s|$)')
@@ -175,7 +176,60 @@ class TelegramBot:
         self._raw_send(chat, text, **kw)
 
     def typing(self, chat: int) -> None:
+        """Send typing indicator (lasts 5 seconds)."""
         self._post("sendChatAction", {"chat_id": chat, "action": "typing"})
+
+    async def keep_typing(self, chat: int, while_running: Callable[[], bool]) -> None:
+        """
+        Keep sending typing indicator while a condition is true.
+
+        Args:
+            chat: Chat ID
+            while_running: Function that returns True while typing should continue
+
+        Example:
+            streaming = True
+            task = asyncio.create_task(bot.keep_typing(chat_id, lambda: streaming))
+            # ... do work ...
+            streaming = False
+            await task
+        """
+        while while_running():
+            self.typing(chat)
+            await asyncio.sleep(4)  # Refresh before 5-second expiry
+
+    async def with_typing(
+        self,
+        chat: int,
+        coro: Awaitable,
+    ):
+        """
+        Execute an async operation while showing typing indicator.
+
+        Args:
+            chat: Chat ID
+            coro: Async operation to execute
+
+        Returns:
+            Result of the coroutine
+
+        Example:
+            result = await bot.with_typing(chat_id, process_message(text))
+        """
+        streaming = True
+        typing_task = asyncio.create_task(
+            self.keep_typing(chat, lambda: streaming)
+        )
+
+        try:
+            return await coro
+        finally:
+            streaming = False
+            typing_task.cancel()
+            try:
+                await typing_task
+            except asyncio.CancelledError:
+                pass
 
     def stream_to(
         self,
@@ -193,6 +247,20 @@ class TelegramBot:
         """
         splitter = splitter or self._default_splitter
         return _StreamBuffer(self, chat, buffer_limit, splitter, send_kw)
+
+    def broadcast(self, chats: Set[int], message: str) -> None:
+        """
+        Send a message to multiple chats.
+
+        Args:
+            chats: Set of chat IDs
+            message: Message to send
+        """
+        for chat_id in chats:
+            try:
+                self.send(chat_id, message)
+            except Exception as e:
+                logger.warning(f"Failed to send to chat {chat_id}: {e}")
 
     # ------------------ internal ------------------
     @staticmethod

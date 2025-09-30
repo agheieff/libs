@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+openrouter/__init__.py
+openrouter/openrouter.py
+openrouter/whisper.py
+openrouter.egg-info/PKG-INFO
+openrouter.egg-info/SOURCES.txt
+openrouter.egg-info/dependency_links.txt
+openrouter.egg-info/requires.txt
+openrouter.egg-info/top_level.txt

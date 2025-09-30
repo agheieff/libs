@@ -12,3 +12,6 @@ dependencies = ["httpx>=0.20.0"]
 
 [project.urls]
 Homepage = "https://github.com/agheieff/libs/openrouter"
+
+[tool.setuptools]
+packages = ["openrouter"]

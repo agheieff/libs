@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: cli-loop
+Version: 0.1.0
+Summary: Zero-dep micro CLI loop engine
+Project-URL: Home, https://github.com/agheieff/cli-loop
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+# cli-loop
+Dead-simple delimiter-based CLI loop for Python scripts.
+
+```python
+from cli_loop import CLI, command
+
+@command("hello", "Say hi")
+def handle_hello(args, cli):
+    print("Hi", args)
+
+CLI().run()

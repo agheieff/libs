@@ -4,14 +4,16 @@ import os
 import httpx
 from typing import Union
 
-_API_KEY = os.getenv("OPENAI_API_KEY")
-if not _API_KEY:
-    raise RuntimeError("OPENAI_API_KEY env var not set")
-
 _WHISPER_URL = "https://api.openai.com/v1/audio/transcriptions"
-_HEADERS = {
-    "Authorization": f"Bearer {_API_KEY}",
-}
+
+def _headers() -> dict:
+    """Build headers with OPENAI_API_KEY looked up at call-time."""
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError(
+            "OPENAI_API_KEY not set. Export it or put it in .env to use Whisper."
+        )
+    return {"Authorization": f"Bearer {key}"}
 
 
 async def transcribe_audio(audio: Union[bytes, str], model: str = "whisper-1") -> str:
@@ -41,7 +43,7 @@ async def transcribe_audio(audio: Union[bytes, str], model: str = "whisper-1") -
     }
 
     async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(_WHISPER_URL, headers=_HEADERS, files=files)
+        response = await client.post(_WHISPER_URL, headers=_headers(), files=files)
         response.raise_for_status()
         result = response.json()
 

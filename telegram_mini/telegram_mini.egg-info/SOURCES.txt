@@ -1,0 +1,6 @@
+pyproject.toml
+telegram_mini.py
+telegram_mini.egg-info/PKG-INFO
+telegram_mini.egg-info/SOURCES.txt
+telegram_mini.egg-info/dependency_links.txt
+telegram_mini.egg-info/top_level.txt

@@ -1,0 +1,26 @@
+Metadata-Version: 2.4
+Name: openrouter
+Version: 0.1.0
+Summary: OpenRouter client
+Project-URL: Homepage, https://github.com/agheieff/libs/openrouter
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: httpx>=0.20.0
+
+OpenRouter Python Client (local)
+
+This is a minimal OpenRouter client with:
+- `openrouter/` streaming and complete helpers
+- `openrouter/whisper.py` for OpenAI Whisper transcription (optional)
+
+It expects the following env vars at call-time:
+- `OPENROUTER_API_KEY` for OpenRouter
+- `OPENAI_API_KEY` for Whisper
+
+Install locally (editable) from the project using:
+
+```
+pip install -e file:../libs/openrouter
+```
+
+Note: This package is intended for local development and is not published.

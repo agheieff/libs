@@ -2,7 +2,7 @@
 """Test script for Whisper transcription."""
 import asyncio
 import sys
-from whisper import transcribe_audio
+from openrouter.whisper import transcribe_audio
 
 
 async def main():

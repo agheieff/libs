@@ -14,34 +14,75 @@ MAX_TG_MSG = 4096
 
 
 class Event:
-    __slots__ = ("type", "chat", "text", "raw", "command", "args")
+    __slots__ = ("type", "chat", "text", "raw", "command", "args",
+                 "user_id", "username", "first_name", "last_name", "message_id")
 
     def __init__(self, upd: dict):
-        m = upd["message"]
         self.raw = upd
-        self.chat = m["chat"]["id"]
-        self.text = m.get("text", "")
 
-        if match := CMD_RE.match(self.text):
-            self.type = "command"
-            self.command = match.group(0).split("@")[0][1:]
-            self.args = self.text[match.end():].strip()
-            return
+        # Handle both regular messages and callback queries
+        if "message" in upd:
+            m = upd["message"]
+            self.chat = m["chat"]["id"]
+            self.text = m.get("text", "")
+            self.message_id = m["message_id"]
 
-        for media, t in (
-            ("photo", "photo"),
-            ("document", "document"),
-            ("voice", "voice"),
-            ("video", "video"),
-            ("audio", "audio"),
-            ("sticker", "sticker"),
-            ("contact", "contact"),
-        ):
-            if media in m:
-                self.type, self.command, self.args = t, "", ""
+            # Extract user information
+            user = m.get("from", {})
+            self.user_id = user.get("id")
+            self.username = user.get("username")
+            self.first_name = user.get("first_name")
+            self.last_name = user.get("last_name")
+
+            if match := CMD_RE.match(self.text):
+                self.type = "command"
+                self.command = match.group(0).split("@")[0][1:]
+                self.args = self.text[match.end():].strip()
                 return
 
-        self.type, self.command, self.args = "text", "", ""
+            for media, t in (
+                ("photo", "photo"),
+                ("document", "document"),
+                ("voice", "voice"),
+                ("video", "video"),
+                ("audio", "audio"),
+                ("sticker", "sticker"),
+                ("contact", "contact"),
+            ):
+                if media in m:
+                    self.type, self.command, self.args = t, "", ""
+                    return
+
+            self.type, self.command, self.args = "text", "", ""
+
+        elif "callback_query" in upd:
+            # Handle callback queries from inline buttons
+            cb = upd["callback_query"]
+            self.type = "callback_query"
+            self.chat = cb["message"]["chat"]["id"]
+            self.message_id = cb["message"]["message_id"]
+            self.text = cb.get("data", "")
+            self.command = ""
+            self.args = ""
+
+            # Extract user information
+            user = cb.get("from", {})
+            self.user_id = user.get("id")
+            self.username = user.get("username")
+            self.first_name = user.get("first_name")
+            self.last_name = user.get("last_name")
+        else:
+            # Unknown update type, set defaults
+            self.type = "unknown"
+            self.chat = None
+            self.text = ""
+            self.command = ""
+            self.args = ""
+            self.message_id = None
+            self.user_id = None
+            self.username = None
+            self.first_name = None
+            self.last_name = None
 
     def get_voice_file_id(self) -> Optional[str]:
         """Get file_id for voice messages, or None if not a voice message."""
@@ -59,6 +100,31 @@ class Event:
 SplitterFn = Callable[[str, int], Tuple[str, int]]
 """Return (visible_part, cut_pos) where cut_pos is the byte index **after** the split.
 visible_part may differ from buffer[:cut_pos] (e.g. you replaced a space with …)."""
+
+
+def inline_keyboard(buttons: list[list[tuple[str, str]]]) -> dict:
+    """
+    Create an inline keyboard markup.
+
+    Args:
+        buttons: List of rows, where each row is a list of (text, callback_data) tuples
+
+    Returns:
+        Dictionary suitable for reply_markup parameter
+
+    Example:
+        keyboard = inline_keyboard([
+            [("Yes", "confirm_yes"), ("No", "confirm_no")],
+            [("Cancel", "cancel")]
+        ])
+        bot.send(chat_id, "Confirm?", reply_markup=keyboard)
+    """
+    return {
+        "inline_keyboard": [
+            [{"text": text, "callback_data": data} for text, data in row]
+            for row in buttons
+        ]
+    }
 
 
 class _StreamBuffer:
@@ -183,9 +249,19 @@ class TelegramBot:
             print("\nBot stopped.")
 
     # ---------- message sending ----------
-    def send(self, chat: int, text: str, **kw) -> None:
-        """Plain send; no splitting logic."""
-        self._raw_send(chat, text, **kw)
+    def send(self, chat: int, text: str, **kw) -> dict:
+        """
+        Send a message to a chat.
+
+        Args:
+            chat: Chat ID
+            text: Message text
+            **kw: Additional parameters (reply_markup, reply_to_message_id, etc.)
+
+        Returns:
+            Message object from Telegram API
+        """
+        return self._raw_send(chat, text, **kw)
 
     def typing(self, chat: int) -> None:
         """Send typing indicator (lasts 5 seconds)."""
@@ -300,6 +376,74 @@ class TelegramBot:
 
         return response.content
 
+    def edit_message_text(self, chat: int, message_id: int, text: str, **kw) -> dict:
+        """
+        Edit an existing message.
+
+        Args:
+            chat: Chat ID
+            message_id: Message ID to edit
+            text: New text
+            **kw: Additional parameters (reply_markup, parse_mode, etc.)
+
+        Returns:
+            Edited message object
+        """
+        payload = {
+            "chat_id": chat,
+            "message_id": message_id,
+            "text": text,
+            **kw
+        }
+        return self._post("editMessageText", payload)
+
+    def delete_message(self, chat: int, message_id: int) -> bool:
+        """
+        Delete a message.
+
+        Args:
+            chat: Chat ID
+            message_id: Message ID to delete
+
+        Returns:
+            True if successful
+        """
+        payload = {
+            "chat_id": chat,
+            "message_id": message_id
+        }
+        result = self._post("deleteMessage", payload)
+        return result is not None
+
+    def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None,
+                              show_alert: bool = False) -> bool:
+        """
+        Answer a callback query from an inline button.
+
+        Args:
+            callback_query_id: ID from callback_query update
+            text: Optional notification text to show user
+            show_alert: If True, show alert instead of notification
+
+        Returns:
+            True if successful
+
+        Example:
+            # In event handler for callback_query:
+            bot.answer_callback_query(
+                ev.raw["callback_query"]["id"],
+                text="Action confirmed!"
+            )
+        """
+        payload = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text
+        if show_alert:
+            payload["show_alert"] = True
+
+        result = self._post("answerCallbackQuery", payload)
+        return result is not None
+
     # ------------------ internal ------------------
     @staticmethod
     def _default_splitter(buf: str, limit: int) -> Tuple[str, int]:
@@ -315,7 +459,7 @@ class TelegramBot:
         return visible, cut + 1  # +1 to skip the space we consumed
 
     def _raw_send(self, chat: int, text: str, **kw):
-        self._post("sendMessage", {"chat_id": chat, "text": text, **kw})
+        return self._post("sendMessage", {"chat_id": chat, "text": text, **kw})
 
     def register_commands(self, table: list) -> None:
         payload = {

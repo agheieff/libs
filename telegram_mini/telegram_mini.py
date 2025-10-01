@@ -196,12 +196,14 @@ class TelegramBot:
         bot.run(message_handler)
     """
     def __init__(self, token: str, commands: Optional[dict[str, str]] = None,
-                 skip_history: bool = True, offset_file: Optional[str] = None):
+                 skip_history: bool = True, offset_file: Optional[str] = None,
+                 auth_gate: Optional[Callable[[Event], Tuple[bool, Optional[str]]]] = None):
         self.token = token
         self.url = f"https://api.telegram.org/bot{token}/"
         self._sess = requests.Session()
         self._cmds = commands
         self._history_skipped = False
+        self._auth_gate = auth_gate
 
         # Handle offset and skip_history logic
         if skip_history:
@@ -218,8 +220,9 @@ class TelegramBot:
     # ------------------ public high-level API ------------------
     @classmethod
     def start(cls, token: str, commands: Optional[dict[str, str]] = None, 
-              skip_history: bool = True, offset_file: Optional[str] = None) -> "TelegramBot":
-        return cls(token, commands, skip_history, offset_file)
+              skip_history: bool = True, offset_file: Optional[str] = None,
+              auth_gate: Optional[Callable[[Event], Tuple[bool, Optional[str]]]] = None) -> "TelegramBot":
+        return cls(token, commands, skip_history, offset_file, auth_gate)
 
     def run(self, handler: Callable[[Event], None], skip_history: Optional[bool] = None) -> None:
         """Run the bot in the main thread (blocking)."""
@@ -237,7 +240,23 @@ class TelegramBot:
             while True:
                 try:
                     for u in self._get_updates():
-                        handler(Event(u))
+                        ev = Event(u)
+                        if self._auth_gate is not None:
+                            try:
+                                ok, msg = self._auth_gate(ev)
+                            except Exception as e:
+                                logger.warning("auth_gate error: %s", e)
+                                ok, msg = False, ""
+                            if not ok:
+                                if msg:
+                                    try:
+                                        # best-effort send; ignore failures
+                                        if ev.chat is not None:
+                                            self.send(ev.chat, msg)
+                                    except Exception:
+                                        pass
+                                continue
+                        handler(ev)
                 except Exception as e:
                     logger.exception("poll crash: %s", e)
                     time.sleep(1)

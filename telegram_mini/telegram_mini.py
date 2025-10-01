@@ -1,4 +1,5 @@
 import io
+import os
 import logging
 import re
 import requests
@@ -8,6 +9,7 @@ import asyncio
 from typing import Callable, Optional, Tuple, Set, Awaitable
 
 logger = logging.getLogger(__name__)
+_DEBUG = os.getenv("TELEGRAM_MINI_DEBUG", "").lower() in ("1", "true", "yes", "on")
 CMD_RE = re.compile(r'^/\w+(@\w+)?(\s|$)')
 
 MAX_TG_MSG = 4096
@@ -481,6 +483,16 @@ class TelegramBot:
         return self._post("sendMessage", {"chat_id": chat, "text": text, **kw})
 
     def register_commands(self, table: list) -> None:
+        # Log registered commands for visibility
+        try:
+            names = [c.name for c in table]
+            msg = f"registering commands: {names}"
+            if _DEBUG:
+                print(f"[telegram_mini] {msg}")
+            else:
+                logger.info(msg)
+        except Exception:
+            pass
         payload = {
             "commands": [{"command": c.name, "description": c.help} for c in table]
         }

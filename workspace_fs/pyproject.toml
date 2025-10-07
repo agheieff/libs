@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "workspace-fs"
+version = "0.1.0"
+description = "Small filesystem helpers: safe_join, sanitize_filename, guess_mime, human_size"
+requires-python = ">=3.8"
+dependencies = []
+
+[tool.setuptools]
+packages = ["workspace_fs"]

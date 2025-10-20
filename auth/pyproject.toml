@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arcadia-auth"
+version = "0.1.0"
+description = "Minimal shared auth library (JWT bearer, Account/Profile)"
+requires-python = ">=3.8"
+dependencies = [
+  "fastapi>=0.110",
+  "pydantic>=2.0",
+  "SQLAlchemy>=2.0",
+  "passlib>=1.7.4",
+  "python-jose>=3.3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/agheieff/libs/auth"
+
+[tool.setuptools]
+packages = ["arcadia_auth"]

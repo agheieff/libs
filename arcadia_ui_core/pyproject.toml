@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arcadia-ui-core"
+version = "0.1.0"
+description = "Core UI building blocks: header, footer, auth modal, theme endpoints"
+requires-python = ">=3.10"
+dependencies = ["fastapi>=0.110", "jinja2"]
+
+[tool.setuptools]
+packages = ["arcadia_ui_core"]

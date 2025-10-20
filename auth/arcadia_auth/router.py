@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+from typing import Optional, Type, Dict, Any
+from dataclasses import dataclass
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Header, status
+
+from .schemas import AccountCreate, AccountOut, LoginIn, TokenOut, ProfileCreate, ProfileOut
+from .security import hash_password, verify_password, create_access_token, decode_token
+from .repo import AuthRepository
+from .policy import validate_password
+
+
+@dataclass
+class AuthSettings:
+    secret_key: str
+    algorithm: str = "HS256"
+    access_expire_minutes: int = 60 * 24 * 7
+    multi_profile: bool = True
+    # Password policy (optional)
+    pwd_min_len: int = 8
+    pwd_max_len: int = 256
+    require_upper: bool = False
+    require_lower: bool = False
+    require_digit: bool = False
+    require_special: bool = False  # non-alnum
+
+
+def _auth_header(authorization: Optional[str] = Header(default=None, alias="Authorization")) -> Optional[str]:
+    if not authorization:
+        return None
+    val = authorization.strip()
+    if not val.lower().startswith("bearer "):
+        return None
+    return val.split(" ", 1)[1]
+
+
+def create_auth_router(
+    repo: AuthRepository,
+    settings: AuthSettings,
+    *,
+    AccountPublic: Type[AccountOut] = AccountOut,
+    ProfilePublic: Type[ProfileOut] = ProfileOut,
+) -> APIRouter:
+    r = APIRouter(prefix="/auth", tags=["auth"])
+
+    def _to_account_out(acc: Dict[str, Any]) -> AccountOut:
+        return AccountPublic.model_validate({
+            "id": acc.get("id"),
+            "email": acc.get("email"),
+            "is_active": bool(acc.get("is_active", True)),
+            "is_verified": bool(acc.get("is_verified", True)),
+            "role": acc.get("role"),
+            "subscription_tier": acc.get("subscription_tier"),
+            "extras": acc.get("extras"),
+        })
+
+    def _to_profile_out(prof: Dict[str, Any]) -> ProfileOut:
+        return ProfilePublic.model_validate({
+            "id": prof.get("id"),
+            "account_id": prof.get("account_id"),
+            "display_name": prof.get("display_name"),
+            "prefs": prof.get("prefs"),
+            "extras": prof.get("extras"),
+        })
+
+    @r.post("/register", response_model=AccountOut, status_code=status.HTTP_201_CREATED)
+    def register(payload: AccountCreate):
+        email = payload.email.strip().lower()
+        if repo.find_account_by_email(email):
+            raise HTTPException(status_code=409, detail="Email already registered")
+        # Validate password policy; None means OK
+        msg = validate_password(payload.password, settings)
+        if msg:
+            raise HTTPException(status_code=422, detail=msg)
+        acc = repo.create_account(email, hash_password(payload.password), name=payload.name)
+        # auto-create default profile when single-profile mode
+        if not settings.multi_profile:
+            repo.create_profile(acc["id"], display_name=(payload.name or email.split("@")[0]), prefs=None, extras=None)
+        return _to_account_out(acc)
+
+    @r.post("/login", response_model=TokenOut)
+    def login(payload: LoginIn):
+        email = payload.email.strip().lower()
+        acc = repo.find_account_by_email(email)
+        if not acc or not verify_password(payload.password, acc.get("password_hash", "")):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        if not acc.get("is_active", True):
+            raise HTTPException(status_code=403, detail="Inactive account")
+        token = create_access_token(acc["id"], settings.secret_key, settings.algorithm, settings.access_expire_minutes)
+        return TokenOut(access_token=token)
+
+    @r.get("/me", response_model=AccountOut)
+    def me(authorization: Optional[str] = Depends(_auth_header)):
+        if not authorization:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
+        if not data or "sub" not in data:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        acc = repo.get_account_by_id(data["sub"])  # type: ignore[arg-type]
+        if not acc:
+            raise HTTPException(status_code=401, detail="User not found")
+        return _to_account_out(acc)
+
+    # Profiles
+    pr = APIRouter(prefix="/profiles", tags=["profiles"])
+
+    @pr.get("/", response_model=list[ProfileOut])
+    def list_my_profiles(authorization: Optional[str] = Depends(_auth_header)):
+        if not authorization:
+            raise HTTPException(401, "Not authenticated")
+        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
+        if not data or "sub" not in data:
+            raise HTTPException(401, "Invalid token")
+        acc_id = data["sub"]
+        profs = repo.list_profiles(acc_id)  # type: ignore[arg-type]
+        return [_to_profile_out(p) for p in profs]
+
+    @pr.post("/", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
+    def create_my_profile(payload: ProfileCreate, authorization: Optional[str] = Depends(_auth_header)):
+        if not settings.multi_profile:
+            raise HTTPException(400, "Multiple profiles disabled")
+        if not authorization:
+            raise HTTPException(401, "Not authenticated")
+        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
+        if not data or "sub" not in data:
+            raise HTTPException(401, "Invalid token")
+        p = repo.create_profile(data["sub"], display_name=payload.display_name, prefs=payload.prefs, extras=payload.extras)  # type: ignore[arg-type]
+        return _to_profile_out(p)
+
+    @pr.delete("/{profile_id}")
+    def delete_my_profile(profile_id: str, authorization: Optional[str] = Depends(_auth_header)):
+        if not authorization:
+            raise HTTPException(401, "Not authenticated")
+        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
+        if not data or "sub" not in data:
+            raise HTTPException(401, "Invalid token")
+        repo.delete_profile(data["sub"], profile_id)  # type: ignore[arg-type]
+        return {"ok": True}
+
+    r.include_router(pr)
+    return r

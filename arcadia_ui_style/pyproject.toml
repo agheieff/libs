@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arcadia-ui-style"
+version = "0.1.0"
+description = "Arcadia opinionated UI theme and templates"
+requires-python = ">=3.10"
+dependencies = ["arcadia-ui-core>=0.1.0"]
+
+[tool.setuptools]
+packages = ["arcadia_ui_style"]

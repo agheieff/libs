@@ -2,12 +2,23 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 _templates = None
 
 
-def mount_templates(templates, *, persist_header: bool | None = None, brand_logo_url: str | None = None, brand_home_url: str | None = None, brand_name: str | None = None, brand_tag: str | None = None):
+def mount_templates(
+    templates,
+    *,
+    persist_header: bool | None = None,
+    brand_logo_url: str | None = None,
+    brand_home_url: str | None = None,
+    brand_name: str | None = None,
+    brand_tag: str | None = None,
+    settings_schema: Optional[Dict[str, Any]] | None = None,
+    settings_mode: Optional[str] = None,
+    nav_items: Optional[List[Dict[str, Any]]] = None,
+):
     global _templates
     _templates = templates
     try:
@@ -22,6 +33,12 @@ def mount_templates(templates, *, persist_header: bool | None = None, brand_logo
             templates.env.globals["brand_name"] = brand_name
         if brand_tag is not None:
             templates.env.globals["brand_tag"] = brand_tag
+        if settings_schema is not None:
+            templates.env.globals["ui_settings_schema"] = settings_schema
+        if settings_mode is not None:
+            templates.env.globals["ui_settings_mode"] = settings_mode
+        if nav_items is not None:
+            templates.env.globals["nav_items"] = nav_items
     except Exception:
         pass
 
@@ -68,3 +85,40 @@ def ui_auth_modal(request: Request):
         return _templates.TemplateResponse("_auth.html", ctx)
     except Exception:
         return HTMLResponse("", status_code=204)
+
+
+@router.get("/ui/settings", response_class=HTMLResponse)
+def ui_settings(request: Request):
+    if _templates is None:
+        return HTMLResponse("", status_code=204)
+    ctx = {
+        "request": request,
+        "settings_schema": getattr(_templates.env, "globals", {}).get("ui_settings_schema"),
+        "settings_mode": getattr(_templates.env, "globals", {}).get("ui_settings_mode"),
+    }
+    try:
+        return _templates.TemplateResponse("_settings.html", ctx)
+    except Exception:
+        return HTMLResponse("", status_code=204)
+
+
+@router.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    if _templates is None:
+        return HTMLResponse("", status_code=204)
+    ctx = {"request": request}
+    try:
+        return _templates.TemplateResponse("login.html", ctx)
+    except Exception:
+        return HTMLResponse("Login page not available", status_code=404)
+
+
+@router.get("/signup", response_class=HTMLResponse)
+def signup_page(request: Request):
+    if _templates is None:
+        return HTMLResponse("", status_code=204)
+    ctx = {"request": request}
+    try:
+        return _templates.TemplateResponse("signup.html", ctx)
+    except Exception:
+        return HTMLResponse("Signup page not available", status_code=404)

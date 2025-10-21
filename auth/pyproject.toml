@@ -19,4 +19,4 @@ dependencies = [
 Homepage = "https://github.com/agheieff/libs/auth"
 
 [tool.setuptools]
-packages = ["arcadia_auth"]
+packages = { find = { include = ["arcadia_auth*"] } }

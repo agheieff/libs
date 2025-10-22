@@ -3,10 +3,6 @@
 
 <!-- Shared application header -->
 <style>
-  /* Sticky footer layout: header + content + footer; footer stays at bottom on short pages */
-  html, body { height: 100%; }
-  body { min-height: 100vh; display: flex; flex-direction: column; }
-  #arcadia-content { flex: 1 0 auto; }
   :root { scrollbar-gutter: stable; }
   .tm-header, .tm-header *, .tm-header *::before, .tm-header *::after { box-sizing: border-box; }
   .tm-header { background:var(--header-bg, var(--bg)); color:var(--header-fg, var(--fg)); border-bottom:1px solid var(--header-border, var(--border)); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif; font-size:14px; line-height:1.25; }
@@ -57,8 +53,6 @@
         <div class="tm-user" id="tm-user">
           <button class="tm-user-btn" id="tm-user-btn">Account ▾</button>
           <div class="tm-user-menu" id="tm-user-menu">
-            <button class="tm-menu-trigger" id="theme-menu-trigger">Theme</button>
-            <div id="theme-submenu" style="display:none; position:absolute; right: 100%; top: 0; padding:6px; z-index: 3000;"></div>
             <a href="/profile">Profile</a>
             <a href="/settings">Settings</a>
             <hr />

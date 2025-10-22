@@ -1,0 +1,8 @@
+<main style="max-width:960px;margin:24px auto;padding:0 16px;">
+  <h1 class="t-fg">Profile</h1>
+  {% if agent %}
+    <p class="t-muted">Authenticated agent id: <strong class="t-fg">{{ agent.id }}</strong></p>
+  {% else %}
+    <p class="t-muted">You are not authenticated.</p>
+  {% endif %}
+</main>

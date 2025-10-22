@@ -35,7 +35,7 @@ def ensure_templates(app_dir: str) -> str:
         (("hx-boost" not in _cur) and ("htmx.org" not in _cur)) or
         ("brand_logo_url" not in _cur) or
         ("tm-header t-header" not in _cur) or
-        ("/static/arcadia_theme.css" not in _cur) or
+        ("/ui-static/arcadia_theme.css" not in _cur) or
         ("header-fg" not in _cur)
     )
     if needs_write:
@@ -44,6 +44,10 @@ def ensure_templates(app_dir: str) -> str:
 <link rel=\"stylesheet\" href=\"/ui-static/arcadia_theme.css\">\n
 <!-- Shared application header -->
 <style>
+  /* Sticky footer layout: header + content + footer; footer stays at bottom on short pages */
+  html, body { height: 100%; }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  #arcadia-content { flex: 1 0 auto; }
   :root { scrollbar-gutter: stable; }
   .tm-header, .tm-header *, .tm-header *::before, .tm-header *::after { box-sizing: border-box; }
   .tm-header { background:var(--header-bg, var(--bg)); color:var(--header-fg, var(--fg)); border-bottom:1px solid var(--header-border, var(--border)); font-family: system-ui, -apple-system, Segoe UI, Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif; font-size:14px; line-height:1.25; }
@@ -94,6 +98,8 @@ def ensure_templates(app_dir: str) -> str:
         <div class=\"tm-user\" id=\"tm-user\">
           <button class=\"tm-user-btn\" id=\"tm-user-btn\">Account ▾</button>
           <div class=\"tm-user-menu\" id=\"tm-user-menu\">
+            <button class=\"tm-menu-trigger\" id=\"theme-menu-trigger\">Theme</button>
+            <div id=\"theme-submenu\" style=\"display:none; position:absolute; right: 100%; top: 0; padding:6px; z-index: 3000;\"></div>
             <a href=\"/profile\">Profile</a>
             <a href=\"/settings\">Settings</a>
             <hr />
@@ -160,38 +166,15 @@ def ensure_templates(app_dir: str) -> str:
         regen_theme = True
 
     if ThemeManager is not None and regen_theme:
-        tm = ThemeManager()
-        tm.register_theme("light", {
-            "bg": "#ffffff",
-            "fg": "#111111",
-            "muted": "#666666",
-            "border": "#e6e6e6",
-            "panel": "#f9f9fb",
-            "primary": "#2563eb",
-            "link": "#2563eb",
-            "link-muted": "#9ca3af",
-            "header-bg": "#111827",
-            "header-fg": "#f9fafb",
-            "header-border": "#1f2937",
-            "btn-fg": "#ffffff",
-        })
-        tm.register_theme("dark", {
-            "bg": "#0a0a0a",
-            "fg": "#e5e7eb",
-            "muted": "#9ca3af",
-            "border": "#1f2937",
-            "panel": "#111827",
-            "primary": "#2563eb",
-            "link": "#93c5fd",
-            "link-muted": "#9ca3af",
-            "header-bg": "#0f1115",
-            "header-fg": "#f9fafb",
-            "header-border": "#1f2937",
-            "btn-fg": "#e5e7eb",
-        })
+        from .theme import ThemeManager as NewThemeManager
+        tm = NewThemeManager()
         theme_css.write_text(tm.generate_css(default="light"), encoding="utf-8")
+        
+        # Create theme selector JavaScript file
+        theme_js = sdir / "theme-selector.js"
+        theme_js.write_text(tm.generate_theme_selector_js(), encoding="utf-8")
     if not footer.exists():
-        footer.write_text("""<footer style=\"margin-top:32px;padding:12px;border-top:1px solid #eee;color:#888\">© Arcadia</footer>\n""", encoding="utf-8")
+        footer.write_text("""<footer style=\"margin-top:auto;padding:12px;border-top:1px solid #eee;color:#888\">© Arcadia</footer>\n""", encoding="utf-8")
     if not css.exists():
         css.write_text(
             ("/* AI Chat-inspired theme */\n" 

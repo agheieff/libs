@@ -3,21 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Profile</title>
+  <title>{{ title or 'Arcadia' }}</title>
   <link rel="stylesheet" href="/ui-static/arcadia_theme.css" />
-  <link rel="stylesheet" href="/static/arcadia.css" />
+  <script src="/ui-static/theme-selector.js"></script>
 </head>
 <body class="theme-light t-bg t-fg" style="margin:0;">
   {% include "_header.html" ignore missing %}
   <div id="arcadia-content">
-    <main style="max-width:960px;margin:24px auto;padding:0 16px;">
-      <h1 class="t-fg">Profile</h1>
-      {% if agent %}
-        <p class="t-muted">Authenticated agent id: <strong class="t-fg">{{ agent.id }}</strong></p>
-      {% else %}
-        <p class="t-muted">You are not authenticated.</p>
-      {% endif %}
-    </main>
+    {% include content_template %}
   </div>
   {% include "_footer.html" ignore missing %}
 </body>

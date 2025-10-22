@@ -148,6 +148,109 @@ def mount_ui_static(app):
         pass
 
 
+def _template_exists(templates, name: str) -> bool:
+    try:
+        if not name:
+            return False
+        templates.env.get_template(name)
+        return True
+    except Exception:
+        return False
+
+
+def _render_subtemplate(templates, name: str, ctx: Dict[str, Any]) -> str:
+    try:
+        return templates.env.get_template(name).render(ctx)
+    except Exception:
+        return ""
+
+
+def render_page(
+    request: Request,
+    templates,
+    *,
+    content_template: str,
+    title: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
+    layout_template: str = "_layout.html",
+    wrapper_template: str = "_content_wrapper.html",
+    status_code: int = 200,
+):
+    """Render a page with DRY composition.
+
+    - Full page (first load): use layout_template which includes header/footer and wraps content under #arcadia-content.
+    - htmx boosted nav (HX-Request=true): return only wrapper_template with #arcadia-content and an out-of-band <title>.
+
+    Falls back to minimal HTML/fragment when templates are missing.
+    """
+    base: Dict[str, Any] = {"request": request, "title": title, "content_template": content_template}
+    if context:
+        base.update(context)
+
+    hx = (request.headers.get("HX-Request") == "true") or (request.headers.get("hx-request") == "true")
+
+    if hx:
+        if _template_exists(templates, wrapper_template):
+            try:
+                return templates.TemplateResponse(wrapper_template, base, status_code=status_code)
+            except Exception:
+                pass
+        # Fallback: render content and wrap with #arcadia-content; include OOB title
+        body = _render_subtemplate(templates, content_template, base)
+        html = f"<title hx-swap-oob=\"true\">{(title or 'Arcadia')}</title>\n<div id=\"arcadia-content\">{body}</div>"
+        return HTMLResponse(content=html, status_code=status_code)
+
+    # Full page
+    if _template_exists(templates, layout_template):
+        try:
+            return templates.TemplateResponse(layout_template, base, status_code=status_code)
+        except Exception:
+            pass
+    # Minimal fallback full page
+    body = _render_subtemplate(templates, content_template, base)
+    html = "".join([
+        "<!DOCTYPE html><html lang=\"en\"><head>",
+        f"<meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>",
+        f"<title>{(title or 'Arcadia')}</title>",
+        "</head><body>",
+        f"<div id=\"arcadia-content\">{body}</div>",
+        "</body></html>",
+    ])
+    return HTMLResponse(content=html, status_code=status_code)
+
+
+def render_composed_page(
+    request: Request,
+    templates,
+    *,
+    glue_template: str,
+    components: Dict[str, str],
+    title: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
+    layout_template: str = "_layout.html",
+    wrapper_template: str = "_content_wrapper.html",
+    status_code: int = 200,
+):
+    """Render a page whose <main> is composed by a glue template that includes component templates.
+
+    The glue template should reference components via the provided mapping, e.g.:
+      {% include components.hero ignore missing %}
+      {% include components.sidebar ignore missing %}
+    """
+    ctx = dict(context or {})
+    ctx["components"] = dict(components or {})
+    return render_page(
+        request,
+        templates,
+        content_template=glue_template,
+        title=title,
+        context=ctx,
+        layout_template=layout_template,
+        wrapper_template=wrapper_template,
+        status_code=status_code,
+    )
+
+
 def _resolve_user_menu_items(user: Any) -> List[Dict[str, Any]]:
     # Provider wins
     try:

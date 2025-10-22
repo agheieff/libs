@@ -17,10 +17,9 @@ for p in (core_pkg, style_pkg, auth_pkg):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from arcadia_ui_core import router as ui_router, mount_templates, mount_ui_static  # type: ignore
+from arcadia_ui_core import router as ui_router, mount_templates, mount_ui_static, render_page  # type: ignore
 from arcadia_ui_style import ensure_templates  # type: ignore
-from arcadia_auth import create_auth_router, AuthSettings, mount_cookie_agent_middleware  # type: ignore
-from arcadia_auth.repo import InMemoryRepo  # type: ignore
+from arcadia_auth import create_auth_router, AuthSettings, mount_cookie_agent_middleware, create_sqlite_repo  # type: ignore
 
 
 app = FastAPI(title="Arcadia Libs Test App")
@@ -42,25 +41,25 @@ mount_ui_static(app)
 mount_templates(templates, persist_header=True)
 app.include_router(ui_router)
 
-# Minimal in-memory auth with defaults
+# SQLite auth with extended schema support
 _settings = AuthSettings(secret_key="dev-secret")
-_repo = InMemoryRepo()
+_repo = create_sqlite_repo("sqlite:///./test_app.db", echo=False)  # Set to True for SQL debugging
 app.include_router(create_auth_router(_repo, _settings))
 mount_cookie_agent_middleware(app, secret_key=_settings.secret_key, algorithm=_settings.algorithm)
 
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "title": "Test App"})
+    return render_page(request, templates, content_template="index_main.html", title="Test App", context={})
 
 @app.get("/profile", response_class=HTMLResponse)
 def profile(request: Request):
     agent = getattr(request.state, "agent", None) or getattr(request.state, "user", None)
-    return templates.TemplateResponse("profile.html", {"request": request, "agent": agent})
+    return render_page(request, templates, content_template="profile_main.html", title="Profile", context={"agent": agent})
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings(request: Request):
-    return templates.TemplateResponse("settings.html", {"request": request})
+    return render_page(request, templates, content_template="settings_main.html", title="Settings", context={})
 
 
 if __name__ == "__main__":

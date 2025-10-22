@@ -91,6 +91,16 @@ def create_auth_router(
         token = create_access_token(acc["id"], settings.secret_key, settings.algorithm, settings.access_expire_minutes)
         return TokenOut(access_token=token)
 
+    @r.get("/logout")
+    def logout():
+        from fastapi.responses import RedirectResponse
+        resp = RedirectResponse(url="/", status_code=302)
+        try:
+            resp.delete_cookie("access_token", path="/")
+        except Exception:
+            pass
+        return resp
+
     @r.get("/me", response_model=AccountOut)
     def me(authorization: Optional[str] = Depends(_auth_header)):
         if not authorization:

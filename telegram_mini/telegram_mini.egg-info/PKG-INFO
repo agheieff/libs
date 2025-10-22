@@ -5,3 +5,4 @@ Summary: Router-based Telegram bot micro-library
 Project-URL: Home, https://github.com/agheieff/libs/telegram_mini
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
+Requires-Dist: requests>=2.0.0

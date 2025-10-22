@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from typing import Optional, Dict, Any, List
+from fastapi.staticfiles import StaticFiles
+from typing import Optional, Dict, Any, List, Callable
 
 _templates = None
+_user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None  # type: ignore[name-defined]
 
 
 def mount_templates(
@@ -18,8 +20,10 @@ def mount_templates(
     settings_schema: Optional[Dict[str, Any]] | None = None,
     settings_mode: Optional[str] = None,
     nav_items: Optional[List[Dict[str, Any]]] = None,
+    user_menu_items: Optional[List[Dict[str, Any]]] = None,
+    user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None,
 ):
-    global _templates
+    global _templates, _user_menu_provider
     _templates = templates
     try:
         if persist_header is not None:
@@ -39,6 +43,10 @@ def mount_templates(
             templates.env.globals["ui_settings_mode"] = settings_mode
         if nav_items is not None:
             templates.env.globals["nav_items"] = nav_items
+        if user_menu_items is not None:
+            templates.env.globals["user_menu_items"] = user_menu_items
+        if user_menu_provider is not None:
+            _user_menu_provider = user_menu_provider
     except Exception:
         pass
 
@@ -122,3 +130,63 @@ def signup_page(request: Request):
         return _templates.TemplateResponse("signup.html", ctx)
     except Exception:
         return HTMLResponse("Signup page not available", status_code=404)
+
+
+def mount_ui_static(app):
+    """Mount UI static assets (served from the ui_style package) under /ui-static.
+
+    Apps should call this once during setup.
+    """
+    try:
+        import arcadia_ui_style as _style  # type: ignore
+        from pathlib import Path as _Path
+        _root = _Path(_style.__file__).resolve().parent
+        _static = _root / "static"
+        if _static.exists():
+            app.mount("/ui-static", StaticFiles(directory=str(_static)), name="ui-static")
+    except Exception:
+        pass
+
+
+def _resolve_user_menu_items(user: Any) -> List[Dict[str, Any]]:
+    # Provider wins
+    try:
+        if _user_menu_provider is not None:
+            items = _user_menu_provider(user)
+            if items:
+                return list(items)
+    except Exception:
+        pass
+    # Then globals
+    try:
+        gi = getattr(_templates.env, "globals", {})  # type: ignore[attr-defined]
+        items = gi.get("user_menu_items")
+        if items:
+            return list(items)
+    except Exception:
+        pass
+    # Defaults
+    if user:
+        return [
+            {"label": "Profile", "href": "/profile"},
+            {"label": "Settings", "href": "/settings"},
+            {"divider": True},
+            {"label": "Log out", "href": "/auth/logout"},
+        ]
+    else:
+        return [
+            {"label": "Log in", "href": "/login"},
+            {"label": "Sign up", "href": "/signup", "primary": True},
+        ]
+
+
+@router.get("/ui/user_menu", response_class=HTMLResponse)
+def ui_user_menu(request: Request):
+    if _templates is None:
+        return HTMLResponse("", status_code=204)
+    user = getattr(request.state, "user", None)
+    ctx = {"request": request, "user_menu_items": _resolve_user_menu_items(user)}
+    try:
+        return _templates.TemplateResponse("_user_menu.html", ctx)
+    except Exception:
+        return HTMLResponse("", status_code=204)

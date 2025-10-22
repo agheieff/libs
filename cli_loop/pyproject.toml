@@ -12,3 +12,6 @@ dependencies = []
 
 [project.urls]
 Home = "https://github.com/agheieff/cli-loop"
+
+[tool.setuptools]
+py-modules = ["cli_loop"]

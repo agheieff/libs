@@ -4,6 +4,11 @@ import os
 from pathlib import Path
 from typing import Any
 
+try:
+    from arcadia_ui_core import ThemeManager  # type: ignore
+except Exception:
+    ThemeManager = None  # type: ignore
+
 def ensure_templates(app_dir: str) -> str:
     """Ensure default header/footer templates and base CSS exist under app's templates/static.
 
@@ -16,41 +21,50 @@ def ensure_templates(app_dir: str) -> str:
     header = tdir / "_header.html"
     footer = tdir / "_footer.html"
     css = sdir / "arcadia.css"
+    theme_css = sdir / "arcadia_theme.css"
     auth = tdir / "_auth.html"
+    login = tdir / "login.html"
+    signup = tdir / "signup.html"
+    settings_panel = tdir / "_settings.html"
+    user_menu_tpl = tdir / "_user_menu.html"
     # Write/refresh header to ensure htmx persistence block exists
     _cur = header.read_text(encoding="utf-8", errors="ignore") if header.exists() else ""
     needs_write = (
         (not header.exists()) or
         ("ai-header" in _cur) or
         (("hx-boost" not in _cur) and ("htmx.org" not in _cur)) or
-        ("brand_logo_url" not in _cur)
+        ("brand_logo_url" not in _cur) or
+        ("tm-header t-header" not in _cur) or
+        ("/static/arcadia_theme.css" not in _cur) or
+        ("header-fg" not in _cur)
     )
     if needs_write:
         header.write_text(
             """
-<!-- Shared header styled like Trading MMO -->
+<link rel=\"stylesheet\" href=\"/ui-static/arcadia_theme.css\">\n
+<!-- Shared application header -->
 <style>
   :root { scrollbar-gutter: stable; }
   .tm-header, .tm-header *, .tm-header *::before, .tm-header *::after { box-sizing: border-box; }
-  .tm-header { background:#111827; color:#e5e7eb; border-bottom:1px solid #1f2937; font-family: system-ui, -apple-system, Segoe UI, Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif; font-size:14px; line-height:1.25; }
+  .tm-header { background:var(--header-bg, var(--bg)); color:var(--header-fg, var(--fg)); border-bottom:1px solid var(--header-border, var(--border)); font-family: system-ui, -apple-system, Segoe UI, Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif; font-size:14px; line-height:1.25; }
   .tm-header .tm-container { max-width:1200px; margin:0 auto; padding:0.75rem 1rem; display:flex; align-items:center; justify-content:space-between; }
   @media (min-width: 640px){ .tm-header .tm-container { min-height:56px; } }
-  .tm-header .tm-brand { color:#f9fafb; font-weight:600; text-decoration:none; letter-spacing:0.2px; font-size:18px; }
-  .tm-header .tm-nav a { color:#9ca3af; text-decoration:none; margin-left:1rem; font-size:14px; }
-  .tm-header .tm-nav a:hover { color:#f9fafb; }
+  .tm-header .tm-brand { color:var(--header-fg, var(--fg)); font-weight:600; text-decoration:none; letter-spacing:0.2px; font-size:18px; }
+  .tm-header .tm-nav a { color:var(--link-muted); text-decoration:none; margin-left:1rem; font-size:14px; }
+  .tm-header .tm-nav a:hover { color:var(--link); }
   .tm-right { display:flex; align-items:center; gap:1rem; }
-  .tm-actions .tm-btn { padding:0.35rem 0.75rem; border:1px solid #374151; border-radius:0.375rem; color:#e5e7eb; text-decoration:none; font-size:14px; }
-  .tm-actions .tm-btn:hover { background:#1f2937; }
-  .tm-actions .tm-primary { border-color:#2563eb; background:#2563eb; }
-  .tm-actions .tm-primary:hover { background:#1d4ed8; }
+  .tm-actions .tm-btn { padding:0.35rem 0.75rem; border:1px solid var(--header-border, var(--border)); border-radius:0.375rem; color:var(--header-fg, var(--fg)); text-decoration:none; font-size:14px; background:transparent; }
+  .tm-actions .tm-btn:hover { background:transparent; }
+  .tm-actions .tm-primary { border-color:var(--primary); background:var(--primary); color:var(--btn-fg, #fff); }
   .tm-user { position:relative; }
-  .tm-user-btn { padding:0.35rem 0.75rem; border:1px solid #374151; border-radius:0.375rem; color:#e5e7eb; background:#111827; cursor:pointer; font-size:14px; }
-  .tm-user-menu { position:absolute; right:0; top:2.25rem; background:#111827; border:1px solid #1f2937; border-radius:0.375rem; min-width:180px; display:none; z-index:50; }
-  .tm-user-menu a { display:block; padding:0.5rem 0.75rem; color:#e5e7eb; text-decoration:none; font-size:14px; }
-  .tm-user-menu a:hover { background:#1f2937; }
-  .tm-divider { width:1px; height:18px; background:#374151; margin:0 0.5rem; }
-  .tm-nav a.active { color:#f9fafb; }
-  .tm-brand small { color:#9ca3af; font-weight:400; font-size:12px; margin-left:6px; }
+  .tm-user-btn { padding:0.35rem 0.75rem; border:1px solid var(--header-border, var(--border)); border-radius:0.375rem; color:var(--header-fg, var(--fg)); background:transparent; cursor:pointer; font-size:14px; }
+  .tm-user-menu { position:absolute; right:0; top:2.25rem; background:var(--panel); border:1px solid var(--border); border-radius:0.375rem; min-width:180px; display:none; z-index:50; }
+  .tm-user:focus-within .tm-user-menu { display:block; }
+  .tm-user-menu a { display:block; padding:0.5rem 0.75rem; color:var(--fg); text-decoration:none; font-size:14px; }
+  .tm-user-menu a:hover { background:var(--border); }
+  .tm-divider { width:1px; height:18px; background:var(--border); margin:0 0.5rem; }
+  .tm-nav a.active { color:var(--fg); }
+  .tm-brand small { color:var(--muted); font-weight:400; font-size:12px; margin-left:6px; }
   .tm-flex { display:flex; align-items:center; gap:.75rem; }
   .tm-nav { display:flex; align-items:center; }
   @media (max-width: 640px){ .tm-nav a { margin-left:.5rem; } }
@@ -61,19 +75,22 @@ def ensure_templates(app_dir: str) -> str:
   .tm-menu-right { position:relative; }
   .tm-user-menu hr { border:none; border-top:1px solid #1f2937; margin:4px 0; }
 </style>
-<header class=\"tm-header\">
+<header class=\"tm-header t-header\">
   <div class=\"tm-container\">
     <a class=\"tm-brand\" href=\"{{ brand_home_url or '/' }}\">
       {% if brand_logo_url %}<img src=\"{{ brand_logo_url }}\" alt=\"logo\" style=\"height:22px;vertical-align:middle;margin-right:8px;\"/>{% endif %}
-      {{ brand_name or 'Trading MMO' }}<small>{{ brand_tag or '' }}</small>
+      {{ brand_name or 'Project Name' }}<small>{{ brand_tag or '' }}</small>
     </a>
-    <div class=\"tm-right\">
-      <nav class=\"tm-nav\" aria-label=\"Primary\">
-        <a href=\"/\" class=\"tm-link\">Home</a>
-        <a href=\"/chart\" class=\"tm-link\">Chart</a>
-        <a href=\"/docs\" class=\"tm-link\">API</a>
-      </nav>
-      {% if request and request.state and request.state.user %}
+    <div class=\"tm-right\"> 
+      {% set _nav = nav_items if (nav_items is defined) else [] %}
+      {% if _nav and _nav|length > 0 %}
+        <nav class=\"tm-nav\" aria-label=\"Primary\"> 
+          {% for it in _nav %}
+            <a href=\"{{ it.href }}\" class=\"tm-link{% if it.active %} active{% endif %}\">{{ it.label }}</a>
+          {% endfor %}
+        </nav>
+      {% endif %}
+      {% if request and request.state and request.state.user %} 
         <div class=\"tm-user\" id=\"tm-user\">
           <button class=\"tm-user-btn\" id=\"tm-user-btn\">Account ▾</button>
           <div class=\"tm-user-menu\" id=\"tm-user-menu\">
@@ -94,15 +111,7 @@ def ensure_templates(app_dir: str) -> str:
     </div>
   </div>
 </header>
-<script>
-(function(){
-  var btn = document.getElementById('tm-user-btn');
-  var menu = document.getElementById('tm-user-menu');
-  if (!btn || !menu) return;
-  btn.addEventListener('click', function(e){ e.stopPropagation(); menu.style.display = (menu.style.display === 'block' ? 'none' : 'block'); });
-  document.addEventListener('click', function(){ if (menu.style.display === 'block') menu.style.display = 'none'; });
-})();
-</script>
+<!-- Dropdown uses CSS :focus-within; no JS needed -->
 {% set __persist = persist_header if persist_header is defined else true %}
 {% if __persist %}
 <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-+bVsx3b8QdE7cO1S4oFQ9hQ1TImfQxWqS4LzJd8j3jL5uFQw8L7f3NfL2hJdJg9w" crossorigin="anonymous"></script>
@@ -119,29 +128,70 @@ def ensure_templates(app_dir: str) -> str:
   }catch(e){}
 })();
 </script>
-<!-- Persistent module hook: re-initialize pages after HTMX swaps (e.g., chart bootstrap) -->
-<script type="module">
-  const initPage = async () => {
-    const chartCanvas = document.getElementById('price-chart');
-    if (chartCanvas) {
-      try {
-        const mod = await import('/static/js/modules/app.js');
-        if (!window._arcadia_chart) {
-          window._arcadia_chart = mod.bootstrapApp?.();
-        }
-      } catch (e) { /* ignore */ }
+<!-- App-neutral UI re-init event; apps can hook `ui:reinit` to (re)initialize features -->
+<script>
+(function(){
+  try{
+    function fire(){
+      try{ window.dispatchEvent(new CustomEvent('ui:reinit')); }catch(e){}
     }
-  };
-  window.addEventListener('DOMContentLoaded', initPage);
-  document.body.addEventListener('htmx:afterSwap', initPage);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') initPage();
-  });
-}</script>
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fire, { once: true });
+    } else {
+      fire();
+    }
+    try{ document.body.addEventListener('htmx:afterSwap', fire); }catch(e){}
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') fire(); });
+  }catch(e){}
+})();
+</script>
 {% endif %}
             """,
             encoding="utf-8",
         )
+    # Ensure theme stylesheet exists (defines tokens and role classes)
+    regen_theme = False
+    if theme_css.exists():
+        try:
+            _tc = theme_css.read_text(encoding="utf-8", errors="ignore")
+            if "--header-fg" not in _tc or ".theme-light" not in _tc:
+                regen_theme = True
+        except Exception:
+            regen_theme = True
+    else:
+        regen_theme = True
+
+    if ThemeManager is not None and regen_theme:
+        tm = ThemeManager()
+        tm.register_theme("light", {
+            "bg": "#ffffff",
+            "fg": "#111111",
+            "muted": "#666666",
+            "border": "#e6e6e6",
+            "panel": "#f9f9fb",
+            "primary": "#2563eb",
+            "link": "#2563eb",
+            "link-muted": "#9ca3af",
+            "header-bg": "#111827",
+            "header-fg": "#f9fafb",
+            "header-border": "#1f2937",
+            "btn-fg": "#ffffff",
+        })
+        tm.register_theme("dark", {
+            "bg": "#0a0a0a",
+            "fg": "#e5e7eb",
+            "muted": "#9ca3af",
+            "border": "#1f2937",
+            "panel": "#111827",
+            "primary": "#2563eb",
+            "link": "#93c5fd",
+            "link-muted": "#9ca3af",
+            "header-bg": "#0f1115",
+            "header-fg": "#f9fafb",
+            "header-border": "#1f2937",
+            "btn-fg": "#e5e7eb",
+        })
+        theme_css.write_text(tm.generate_css(default="light"), encoding="utf-8")
     if not footer.exists():
         footer.write_text("""<footer style=\"margin-top:32px;padding:12px;border-top:1px solid #eee;color:#888\">© Arcadia</footer>\n""", encoding="utf-8")
     if not css.exists():
@@ -178,6 +228,75 @@ def ensure_templates(app_dir: str) -> str:
   </form>
 </dialog>
             """,
+            encoding="utf-8",
+        )
+    if not login.exists():
+        login.write_text(
+            """<!DOCTYPE html>
+<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Log in - Arcadia</title>\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n</head>\n<body class=\"bg-gray-100 min-h-screen\" style=\"margin:0;\">\n    {% include \"_header.html\" ignore missing %}\n    <div id=\"arcadia-content\">\n    <div class=\"max-w-md mx-auto mt-12 bg-white shadow p-6 rounded\">\n        <h1 class=\"text-2xl font-semibold mb-4\">Log in</h1>\n        <form id=\"login-form\" class=\"space-y-4\" onsubmit=\"return false;\">\n            <div>\n                <label class=\"block text-sm mb-1\">Email</label>\n                <input id=\"email\" type=\"email\" class=\"w-full border rounded p-2\" required />\n            </div>\n            <div>\n                <label class=\"block text-sm mb-1\">Password</label>\n                <input id=\"password\" type=\"password\" class=\"w-full border rounded p-2\" required />\n            </div>\n            <button id=\"login-btn\" class=\"w-full bg-blue-600 text-white py-2 rounded\">Log in</button>\n            <p id=\"login-error\" class=\"text-sm text-red-600 mt-2\" style=\"display:none;\"></p>\n        </form>\n    </div>\n    <script>\n    function extractErrorMessage(data, fallback) {\n        if (!data) return fallback;\n        const d = data.detail;\n        if (typeof d === 'string') return d;\n        if (Array.isArray(d) && d.length) {\n            const first = d[0] || {};\n            const loc = first.loc || [];\n            if (loc.includes('password')) return 'Password must be at least 8 characters.';\n            if (loc.includes('email')) return 'Please enter a valid email address.';\n            return first.msg || fallback;\n        }\n        return fallback;\n    }\n    document.getElementById('login-btn').addEventListener('click', async () => {\n        const email = (document.getElementById('email').value || '').trim();\n        const password = document.getElementById('password').value || '';\n        const err = document.getElementById('login-error');\n        err.style.display = 'none';\n        try {\n            const res = await fetch('/auth/login', {\n                method: 'POST', headers: {'Content-Type': 'application/json'},\n                body: JSON.stringify({ email, password })\n            });\n            if (!res.ok) {\n                const d = await res.json().catch(()=>null);\n                throw new Error(extractErrorMessage(d, 'Login failed'));\n            }\n            const data = await res.json();\n            try {\n                document.cookie = `access_token=${data.access_token}; Path=/; SameSite=Lax`;\n            } catch {}\n            window.location.href = '/';\n        } catch (e) {\n            err.textContent = e.message || 'Login failed';\n            err.style.display = 'block';\n        }\n    });\n    </script>\n</div>\n</body>\n</html>\n""",
+            encoding="utf-8",
+        )
+    if not signup.exists():
+        signup.write_text(
+            """<!DOCTYPE html>
+<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Sign up - Arcadia</title>\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n    <style>.hint{font-size:.85rem;color:#6b7280}</style>\n</head>\n<body class=\"bg-gray-100 min-h-screen\" style=\"margin:0;\">\n    {% include \"_header.html\" ignore missing %}\n    <div id=\"arcadia-content\">\n    <div class=\"max-w-md mx-auto mt-12 bg-white shadow p-6 rounded\">\n        <h1 class=\"text-2xl font-semibold mb-4\">Create your account</h1>\n        <form id=\"signup-form\" class=\"space-y-4\" onsubmit=\"return false;\">\n            <div>\n                <label class=\"block text-sm mb-1\">Email</label>\n                <input id=\"email\" type=\"email\" class=\"w-full border rounded p-2\" required />\n            </div>\n            <div>\n                <label class=\"block text-sm mb-1\">Password</label>\n                <input id=\"password\" type=\"password\" class=\"w-full border rounded p-2\" required />\n                <div class=\"hint\">At least 8 characters</div>\n            </div>\n            <button id=\"signup-btn\" class=\"w-full bg-blue-600 text-white py-2 rounded\">Sign up</button>\n            <p id=\"signup-error\" class=\"text-sm text-red-600 mt-2\" style=\"display:none;\"></p>\n        </form>\n    </div>\n    <script>\n    function extractErrorMessage(data, fallback) {\n        if (!data) return fallback;\n        const d = data.detail;\n        if (typeof d === 'string') return d;\n        if (Array.isArray(d) && d.length) {\n            const first = d[0] || {};\n            const loc = first.loc || [];\n            if (loc.includes('password')) return 'Password must be at least 8 characters.';\n            if (loc.includes('email')) return 'Please enter a valid email address.';\n            return first.msg || fallback;\n        }\n        return fallback;\n    }\n    document.getElementById('signup-btn').addEventListener('click', async () => {\n        const email = (document.getElementById('email').value || '').trim();\n        const password = document.getElementById('password').value || '';\n        const err = document.getElementById('signup-error');\n        err.style.display = 'none';\n        try {\n            const res = await fetch('/auth/register', {\n                method: 'POST', headers: {'Content-Type': 'application/json'},\n                body: JSON.stringify({ email, password })\n            });\n            if (!res.ok) {\n                const d = await res.json().catch(()=>null);\n                throw new Error(extractErrorMessage(d, 'Sign up failed'));\n            }\n            const res2 = await fetch('/auth/login', {\n                method: 'POST', headers: {'Content-Type': 'application/json'},\n                body: JSON.stringify({ email, password })\n            });\n            if (!res2.ok) {\n                const d2 = await res2.json().catch(()=>null);\n                throw new Error(extractErrorMessage(d2, 'Login failed'));\n            }\n            const data = await res2.json();\n            try {\n                document.cookie = `access_token=${data.access_token}; Path=/; SameSite=Lax`;\n            } catch {}\n            window.location.href = '/';\n        } catch (e) {\n            err.textContent = e.message || 'Sign up failed';\n            err.style.display = 'block';\n        }\n    });\n    </script>\n    \n</div>\n</body>\n</html>\n""",
+            encoding="utf-8",
+        )
+    if not settings_panel.exists():
+        settings_panel.write_text(
+            """
+<div id=\"ui-settings\" data-mode=\"{{ settings_mode or (settings_schema.mode if settings_schema and settings_schema.mode else 'immediate') }}\">
+  {% set schema = (settings_schema or ui_settings_schema) or {} %}
+  {% set fields = schema.fields if schema and schema.fields else [] %}
+  {% set status_id = schema.status_id if schema and schema.status_id else 'ui-settings-status' %}
+  <div id=\"{{ status_id }}\" class=\"ui-settings-status\" style=\"margin:8px 0;color:#555\"></div>
+  <div class=\"ui-settings-body\">
+    {% for f in fields %}
+      <div class=\"ui-field\" data-field=\"{{ f.id }}\" data-save-path=\"{{ f.save_path or schema.save_path or '' }}\" data-save-method=\"{{ f.save_method or schema.save_method or 'POST' }}\" data-group=\"{{ f.group or '' }}\">
+        {% if f.type == 'select' %}
+          <label>{{ f.label }}
+            <select id=\"ui-f-{{ f.id }}\">
+              {% for opt in f.options or [] %}
+                <option value=\"{{ opt.value }}\" {% if opt.value == f.value %}selected{% endif %}>{{ opt.label or opt.value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        {% elif f.type == 'checkbox' %}
+          <label><input type=\"checkbox\" id=\"ui-f-{{ f.id }}\" {% if f.value %}checked{% endif %}/> {{ f.label }}</label>
+        {% else %}
+          <label>{{ f.label }} <input type=\"text\" id=\"ui-f-{{ f.id }}\" value=\"{{ f.value or '' }}\"/></label>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% if (settings_mode or (schema.mode if schema and schema.mode else None)) == 'manual' %}
+    <div style=\"margin-top:10px\"><button id=\"ui-settings-save\">Save</button></div>
+  {% endif %}
+</div>
+<script>
+(function(){
+  try{
+    const root=document.getElementById('ui-settings'); if(!root) return;
+    const mode=root.dataset.mode||'immediate';
+    const status=document.getElementById('{{ status_id }}');
+    function setStatus(ok,msg){ if(status){ status.textContent=msg||(ok?'Saved':'Error'); status.style.color=ok?'#055':'#700'; status.style.background=ok?'#e6ffed':'#ffeaea'; status.style.border='1px solid '+(ok?'#b7f5c7':'#ffb3b3'); status.style.padding='6px 8px'; status.style.borderRadius='4px'; }
+      try{ window.dispatchEvent(new CustomEvent('ui-settings-status',{detail:{ok:!!ok,message:msg||''}})); }catch(e){}
+    }
+    function collect(onlyId){ const data={}; const grouped={}; const fields=root.querySelectorAll('.ui-field'); fields.forEach(function(w){ const id=w.getAttribute('data-field'); if(!id|| (onlyId && onlyId!==id)) return; const group=(w.getAttribute('data-group')||'').trim(); const input=w.querySelector('select, input[type=text], input[type=checkbox]'); if(!input) return; let val; if(input.tagName==='SELECT') val=input.value; else if(input.type==='checkbox') val=input.checked; else val=input.value; if(group){ grouped[group]=grouped[group]||{}; grouped[group][id]=val; } else { data[id]=val; } }); for(const k in grouped){ data[k]=grouped[k]; } return data; }
+    async function saveOne(id){ const el=root.querySelector('.ui-field[data-field="'+id+'"]'); if(!el) return; const path=el.getAttribute('data-save-path')||'{{ schema.save_path or '' }}'; const method=el.getAttribute('data-save-method')||'{{ schema.save_method or 'POST' }}'; if(!path){ setStatus(false,'No save_path configured'); return; } const payload=collect(id); try{ const res=await fetch(path,{method:method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); const ok=res.ok; let msg= ok?'Saved':'Save failed'; try{ const t=await res.text(); const j=JSON.parse(t); msg=j.detail||(ok?'Saved':'Error'); }catch{} setStatus(ok,msg);}catch(e){ setStatus(false,'Network error'); } }
+    function bind(){ const fields=root.querySelectorAll('.ui-field'); fields.forEach(function(w){ const id=w.getAttribute('data-field'); const input=w.querySelector('select, input[type=text], input[type=checkbox]'); if(!input||!id) return; if(mode==='immediate'){ input.addEventListener('change', function(){ saveOne(id); }); } }); const btn=document.getElementById('ui-settings-save'); if(btn){ btn.addEventListener('click', async function(){ const path='{{ schema.save_path or '' }}'; const method='{{ schema.save_method or 'POST' }}'; if(!path){ setStatus(false,'No save_path configured'); return; } const payload=collect(null); try{ const res=await fetch(path,{method:method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); const ok=res.ok; let msg= ok?'Saved':'Save failed'; try{ const t=await res.text(); const j=JSON.parse(t); msg=j.detail||(ok?'Saved':'Error'); }catch{} setStatus(ok,msg);}catch(e){ setStatus(false,'Network error'); } }); } }
+    bind();
+  }catch(e){}
+})();
+</script>
+            """,
+            encoding="utf-8",
+        )
+    # Write user menu partial if missing
+    if not user_menu_tpl.exists():
+        user_menu_tpl.write_text(
+            """
+<div class=\"tm-user\" id=\"tm-user\">\n  <button class=\"tm-user-btn t-btn\" id=\"tm-user-btn\">Account ▾</button>\n  <div class=\"tm-user-menu t-panel t-border\" id=\"tm-user-menu\">\n    {% set _items = (user_menu_items or []) %}\n    {% for it in _items %}\n      {% if it.divider %}<hr />{% else %}<a class=\"t-fg\" href=\"{{ it.href }}\">{{ it.label }}</a>{% endif %}\n    {% endfor %}\n  </div>\n</div>\n            """,
             encoding="utf-8",
         )
     return str(tdir)

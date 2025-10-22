@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arcadia-libs-test-app"
+version = "0.0.1"
+description = "Minimal app to exercise arcadia_ui_core, arcadia_ui_style, and arcadia_auth with defaults"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.24",
+  "jinja2>=3.1.0",
+  "arcadia-ui-core",
+  "arcadia-ui-style",
+  "arcadia-auth",
+]
+
+[tool.setuptools]
+packages = { find = { include = ["test_app*" ] } }
+
+[tool.uv.sources]
+arcadia-ui-core = { path = "../arcadia_ui_core" }
+arcadia-ui-style = { path = "../arcadia_ui_style" }
+arcadia-auth = { path = "../auth" }

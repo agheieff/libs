@@ -11,3 +11,8 @@ dependencies = ["arcadia-ui-core>=0.1.0"]
 
 [tool.setuptools]
 packages = ["arcadia_ui_style"]
+
+[tool.setuptools.package-data]
+arcadia_ui_style = [
+  "static/*",
+]

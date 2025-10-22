@@ -4,6 +4,11 @@ import os
 from pathlib import Path
 from typing import Any
 
+try:
+    from arcadia_ui_core import ThemeManager  # type: ignore
+except Exception:
+    ThemeManager = None  # type: ignore
+
 def ensure_templates(app_dir: str) -> str:
     """Ensure default header/footer templates and base CSS exist under app's templates/static.
 
@@ -16,10 +21,12 @@ def ensure_templates(app_dir: str) -> str:
     header = tdir / "_header.html"
     footer = tdir / "_footer.html"
     css = sdir / "arcadia.css"
+    theme_css = sdir / "arcadia_theme.css"
     auth = tdir / "_auth.html"
     login = tdir / "login.html"
     signup = tdir / "signup.html"
     settings_panel = tdir / "_settings.html"
+    user_menu_tpl = tdir / "_user_menu.html"
     # Write/refresh header to ensure htmx persistence block exists
     _cur = header.read_text(encoding="utf-8", errors="ignore") if header.exists() else ""
     needs_write = (
@@ -27,35 +34,37 @@ def ensure_templates(app_dir: str) -> str:
         ("ai-header" in _cur) or
         (("hx-boost" not in _cur) and ("htmx.org" not in _cur)) or
         ("brand_logo_url" not in _cur) or
-        ("Trading MMO" in _cur)  # refresh legacy default brand text
+        ("tm-header t-header" not in _cur) or
+        ("/static/arcadia_theme.css" not in _cur) or
+        ("header-fg" not in _cur)
     )
     if needs_write:
         header.write_text(
             """
-<!-- Shared header styled like Trading MMO -->
+<link rel=\"stylesheet\" href=\"/ui-static/arcadia_theme.css\">\n
+<!-- Shared application header -->
 <style>
   :root { scrollbar-gutter: stable; }
   .tm-header, .tm-header *, .tm-header *::before, .tm-header *::after { box-sizing: border-box; }
-  .tm-header { background:#111827; color:#e5e7eb; border-bottom:1px solid #1f2937; font-family: system-ui, -apple-system, Segoe UI, Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif; font-size:14px; line-height:1.25; }
+  .tm-header { background:var(--header-bg, var(--bg)); color:var(--header-fg, var(--fg)); border-bottom:1px solid var(--header-border, var(--border)); font-family: system-ui, -apple-system, Segoe UI, Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif; font-size:14px; line-height:1.25; }
   .tm-header .tm-container { max-width:1200px; margin:0 auto; padding:0.75rem 1rem; display:flex; align-items:center; justify-content:space-between; }
   @media (min-width: 640px){ .tm-header .tm-container { min-height:56px; } }
-  .tm-header .tm-brand { color:#f9fafb; font-weight:600; text-decoration:none; letter-spacing:0.2px; font-size:18px; }
-  .tm-header .tm-nav a { color:#9ca3af; text-decoration:none; margin-left:1rem; font-size:14px; }
-  .tm-header .tm-nav a:hover { color:#f9fafb; }
+  .tm-header .tm-brand { color:var(--header-fg, var(--fg)); font-weight:600; text-decoration:none; letter-spacing:0.2px; font-size:18px; }
+  .tm-header .tm-nav a { color:var(--link-muted); text-decoration:none; margin-left:1rem; font-size:14px; }
+  .tm-header .tm-nav a:hover { color:var(--link); }
   .tm-right { display:flex; align-items:center; gap:1rem; }
-  .tm-actions .tm-btn { padding:0.35rem 0.75rem; border:1px solid #374151; border-radius:0.375rem; color:#e5e7eb; text-decoration:none; font-size:14px; }
-  .tm-actions .tm-btn:hover { background:#1f2937; }
-  .tm-actions .tm-primary { border-color:#2563eb; background:#2563eb; }
-  .tm-actions .tm-primary:hover { background:#1d4ed8; }
+  .tm-actions .tm-btn { padding:0.35rem 0.75rem; border:1px solid var(--header-border, var(--border)); border-radius:0.375rem; color:var(--header-fg, var(--fg)); text-decoration:none; font-size:14px; background:transparent; }
+  .tm-actions .tm-btn:hover { background:transparent; }
+  .tm-actions .tm-primary { border-color:var(--primary); background:var(--primary); color:var(--btn-fg, #fff); }
   .tm-user { position:relative; }
-  .tm-user-btn { padding:0.35rem 0.75rem; border:1px solid #374151; border-radius:0.375rem; color:#e5e7eb; background:#111827; cursor:pointer; font-size:14px; }
-  .tm-user-menu { position:absolute; right:0; top:2.25rem; background:#111827; border:1px solid #1f2937; border-radius:0.375rem; min-width:180px; display:none; z-index:50; }
+  .tm-user-btn { padding:0.35rem 0.75rem; border:1px solid var(--header-border, var(--border)); border-radius:0.375rem; color:var(--header-fg, var(--fg)); background:transparent; cursor:pointer; font-size:14px; }
+  .tm-user-menu { position:absolute; right:0; top:2.25rem; background:var(--panel); border:1px solid var(--border); border-radius:0.375rem; min-width:180px; display:none; z-index:50; }
   .tm-user:focus-within .tm-user-menu { display:block; }
-  .tm-user-menu a { display:block; padding:0.5rem 0.75rem; color:#e5e7eb; text-decoration:none; font-size:14px; }
-  .tm-user-menu a:hover { background:#1f2937; }
-  .tm-divider { width:1px; height:18px; background:#374151; margin:0 0.5rem; }
-  .tm-nav a.active { color:#f9fafb; }
-  .tm-brand small { color:#9ca3af; font-weight:400; font-size:12px; margin-left:6px; }
+  .tm-user-menu a { display:block; padding:0.5rem 0.75rem; color:var(--fg); text-decoration:none; font-size:14px; }
+  .tm-user-menu a:hover { background:var(--border); }
+  .tm-divider { width:1px; height:18px; background:var(--border); margin:0 0.5rem; }
+  .tm-nav a.active { color:var(--fg); }
+  .tm-brand small { color:var(--muted); font-weight:400; font-size:12px; margin-left:6px; }
   .tm-flex { display:flex; align-items:center; gap:.75rem; }
   .tm-nav { display:flex; align-items:center; }
   @media (max-width: 640px){ .tm-nav a { margin-left:.5rem; } }
@@ -66,7 +75,7 @@ def ensure_templates(app_dir: str) -> str:
   .tm-menu-right { position:relative; }
   .tm-user-menu hr { border:none; border-top:1px solid #1f2937; margin:4px 0; }
 </style>
-<header class=\"tm-header\">
+<header class=\"tm-header t-header\">
   <div class=\"tm-container\">
     <a class=\"tm-brand\" href=\"{{ brand_home_url or '/' }}\">
       {% if brand_logo_url %}<img src=\"{{ brand_logo_url }}\" alt=\"logo\" style=\"height:22px;vertical-align:middle;margin-right:8px;\"/>{% endif %}
@@ -87,10 +96,8 @@ def ensure_templates(app_dir: str) -> str:
           <div class=\"tm-user-menu\" id=\"tm-user-menu\">
             <a href=\"/profile\">Profile</a>
             <a href=\"/settings\">Settings</a>
-            <a href=\"/words\">My Words</a>
-            <a href=\"/stats\">Statistics</a>
             <hr />
-            <a href=\"/logout\">Log out</a>
+            <a href=\"/auth/logout\">Log out</a>
           </div>
         </div>
       {% else %}
@@ -119,29 +126,70 @@ def ensure_templates(app_dir: str) -> str:
   }catch(e){}
 })();
 </script>
-<!-- Persistent module hook: re-initialize pages after HTMX swaps (e.g., chart bootstrap) -->
-<script type="module">
-  const initPage = async () => {
-    const chartCanvas = document.getElementById('price-chart');
-    if (chartCanvas) {
-      try {
-        const mod = await import('/static/js/modules/app.js');
-        if (!window._arcadia_chart) {
-          window._arcadia_chart = mod.bootstrapApp?.();
-        }
-      } catch (e) { /* ignore */ }
+<!-- App-neutral UI re-init event; apps can hook `ui:reinit` to (re)initialize features -->
+<script>
+(function(){
+  try{
+    function fire(){
+      try{ window.dispatchEvent(new CustomEvent('ui:reinit')); }catch(e){}
     }
-  };
-  window.addEventListener('DOMContentLoaded', initPage);
-  document.body.addEventListener('htmx:afterSwap', initPage);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') initPage();
-  });
-}</script>
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fire, { once: true });
+    } else {
+      fire();
+    }
+    try{ document.body.addEventListener('htmx:afterSwap', fire); }catch(e){}
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') fire(); });
+  }catch(e){}
+})();
+</script>
 {% endif %}
             """,
             encoding="utf-8",
         )
+    # Ensure theme stylesheet exists (defines tokens and role classes)
+    regen_theme = False
+    if theme_css.exists():
+        try:
+            _tc = theme_css.read_text(encoding="utf-8", errors="ignore")
+            if "--header-fg" not in _tc or ".theme-light" not in _tc:
+                regen_theme = True
+        except Exception:
+            regen_theme = True
+    else:
+        regen_theme = True
+
+    if ThemeManager is not None and regen_theme:
+        tm = ThemeManager()
+        tm.register_theme("light", {
+            "bg": "#ffffff",
+            "fg": "#111111",
+            "muted": "#666666",
+            "border": "#e6e6e6",
+            "panel": "#f9f9fb",
+            "primary": "#2563eb",
+            "link": "#2563eb",
+            "link-muted": "#9ca3af",
+            "header-bg": "#111827",
+            "header-fg": "#f9fafb",
+            "header-border": "#1f2937",
+            "btn-fg": "#ffffff",
+        })
+        tm.register_theme("dark", {
+            "bg": "#0a0a0a",
+            "fg": "#e5e7eb",
+            "muted": "#9ca3af",
+            "border": "#1f2937",
+            "panel": "#111827",
+            "primary": "#2563eb",
+            "link": "#93c5fd",
+            "link-muted": "#9ca3af",
+            "header-bg": "#0f1115",
+            "header-fg": "#f9fafb",
+            "header-border": "#1f2937",
+            "btn-fg": "#e5e7eb",
+        })
+        theme_css.write_text(tm.generate_css(default="light"), encoding="utf-8")
     if not footer.exists():
         footer.write_text("""<footer style=\"margin-top:32px;padding:12px;border-top:1px solid #eee;color:#888\">© Arcadia</footer>\n""", encoding="utf-8")
     if not css.exists():
@@ -240,6 +288,13 @@ def ensure_templates(app_dir: str) -> str:
 })();
 </script>
             """,
+            encoding="utf-8",
+        )
+    # Write user menu partial if missing
+    if not user_menu_tpl.exists():
+        user_menu_tpl.write_text(
+            """
+<div class=\"tm-user\" id=\"tm-user\">\n  <button class=\"tm-user-btn t-btn\" id=\"tm-user-btn\">Account ▾</button>\n  <div class=\"tm-user-menu t-panel t-border\" id=\"tm-user-menu\">\n    {% set _items = (user_menu_items or []) %}\n    {% for it in _items %}\n      {% if it.divider %}<hr />{% else %}<a class=\"t-fg\" href=\"{{ it.href }}\">{{ it.label }}</a>{% endif %}\n    {% endfor %}\n  </div>\n</div>\n            """,
             encoding="utf-8",
         )
     return str(tdir)

@@ -17,7 +17,7 @@ for p in (core_pkg, style_pkg, auth_pkg):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from arcadia_ui_core import router as ui_router, mount_templates, mount_ui_static, render_page  # type: ignore
+from arcadia_ui_core import router as ui_router, attach_ui, mount_ui_static, render_page  # type: ignore
 from arcadia_ui_style import ensure_templates  # type: ignore
 from arcadia_auth import create_auth_router, AuthSettings, mount_cookie_agent_middleware, create_sqlite_repo  # type: ignore
 
@@ -38,7 +38,8 @@ templates = Jinja2Templates(directory=str(templates_dir))
 mount_ui_static(app)
 # Optional: still scaffold defaults if you want local files
 # ensure_templates(str(app_dir))
-mount_templates(templates, persist_header=True)
+# Attach UI state so /ui/* endpoints work with the default router
+attach_ui(app, templates, persist_header=True)
 app.include_router(ui_router)
 
 # SQLite auth with extended schema support

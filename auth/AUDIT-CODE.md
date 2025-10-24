@@ -129,3 +129,103 @@ Scope: `/home/agheieff/Arcadia/libs/auth/arcadia_auth` (schemas, router, middlew
 - Consumers may rely on current dict shapes (including `password_hash`). If so, a two‑step migration (deprecate then remove) is advised.
 - If Argon2 dependencies are undesirable in some environments, keep PBKDF2 as default and allow opt‑in Argon2 via settings.
 - Decide whether to support audience/issuer claims broadly (could be optional to avoid breaking simple use cases).
+
+## Post-fix audit (2025-10-24)
+
+This section re-runs the audit after recent fixes and records updated statuses. Scope remains `/home/agheieff/Arcadia/libs/auth/arcadia_auth`.
+
+### Executive summary
+
+- High-impact items remaining: None (0). All previously identified High items have been addressed.
+- Medium-impact items remaining: 2 (exception handling breadth; token claims/audience-issuer options).
+- Low-impact items remaining: 2 (shape consistency across adapters; unused import).
+
+### Status of previously reported items
+
+High impact
+1) Sensitive field exposure via repository return values — Status: Resolved
+   - Evidence:
+     - `models.py` Account.to_dict no longer includes `password_hash` (L40–59)
+     - `adapters/sqlalchemy_repo.py` now separates `_acc_to_dict` (public) from `_acc_to_credentials` (private) (L49–66)
+     - `repo.py` InMemoryRepo sanitizes via `_public_acc` (L74–79) and `create_account` returns sanitized output (L121–127)
+     - `router.py` login uses `repo.get_account_credentials(...)` (L82)
+
+2) Duplicated token decoding logic and header parsing — Status: Resolved
+   - Evidence:
+     - Central helpers in `auth_utils.py`: `parse_bearer_token` (L8) and `extract_subject` (L22)
+     - Router and both middlewares call `extract_subject(...)` (router L104/119/131/141; middleware L44/L90)
+
+3) Repository interface drift and inconsistent shapes — Status: Resolved (core interface); minor shape parity tracked as Low
+   - Evidence:
+     - `repo.py` defines `AuthRepository.get_account_credentials` and optional `MutableAuthRepository` (L7–37, L38–47)
+     - `sqlite_repo.py` implements `MutableAuthRepository` with `update_*` methods; `SQLAlchemyRepo` aligns email normalization
+     - Remaining shape parity nits captured below under Low impact
+
+4) Password hashing defaults lack configurability and modern default — Status: Resolved
+   - Evidence:
+     - `security.py` prefers Argon2 when available and exposes `set_password_context` (L1–20)
+
+Medium impact
+5) Email normalization split between router and repos — Status: Resolved
+   - Evidence:
+     - `SQLAlchemyRepo` and `SQLiteRepository` normalize and perform case-insensitive lookups; router still lower-cases defensively
+
+6) Over-broad exception suppression hides actionable errors — Status: Remaining (Medium)
+   - Evidence:
+     - `security.verify_password` catches broad `Exception` (security.py L28–33)
+     - `router.logout` swallows cookie deletion errors (router.py L96)
+     - Middlewares wrap entire dispatch in `except Exception` (middleware.py L57, L96, L106)
+   - Recommendation: Catch library-specific exceptions (Passlib/JWT/Starlette) and optionally log at debug level; keep non-blocking behavior.
+
+7) Token claims minimal; no audience/issuer options — Status: Remaining (Medium)
+   - Evidence:
+     - `security.create_access_token` emits only `sub`, `iat`, `exp` (security.py L35–41)
+   - Recommendation: Support optional `aud`, `iss`, and configurable clock skew/rotation hooks via settings (off by default).
+
+Low impact
+8) Minor API shape inconsistencies for account/profile fields — Status: Remaining (Low)
+   - Evidence:
+     - `adapters/sqlalchemy_repo._acc_to_dict` omits `timezone`, `avatar_url` and hardcodes `extras: None` (adapters/sqlalchemy_repo.py L49–60, L58)
+     - `models.Account.to_dict` includes `timezone` and `avatar_url` (models.py L40–59)
+     - `repo.InMemoryRepo.create_account` sets top-level `name` and also duplicates it inside `extras` (repo.py L111)
+   - Recommendation: Decide canonical public shapes and align adapters; avoid duplicating `name` inside `extras`.
+
+9) Unused imports/parameters — Status: Remaining (Low)
+   - Evidence:
+     - `sqlite_repo.py` imports `hash_password` but does not use it
+   - Recommendation: Remove the unused import.
+
+### Current ranked findings (highest → lowest impact)
+
+1. Over-broad exception suppression hides actionable errors (Medium)
+   - Where: `security.verify_password` (security.py L28–33), cookie deletion in `router.logout` (router.py L96), and middlewares (middleware.py L57/L96/L106).
+   - Impact: Real misconfigurations (bad hash identifiers, malformed JWTs, cookie issues) become silent failures; harder to debug and monitor.
+   - Suggested improvement: Catch specific exceptions (e.g., from Passlib and python-jose) and log at debug level; keep request flow non-blocking.
+   - Effort: Low.
+
+2. Token claims are minimal; no audience/issuer support (Medium)
+   - Where: `security.create_access_token` (security.py L35–41) and `decode_token` (security.py).
+   - Impact: Limits interoperability across services; complicates future rotation/audience checks.
+   - Suggested improvement: Add optional `aud`/`iss`, allow injection of verification options (skew, audiences) via settings; keep defaults simple.
+   - Effort: Low–Medium.
+
+3. Minor API shape inconsistencies across adapters (Low)
+   - Where: `adapters/sqlalchemy_repo._acc_to_dict` vs `models.Account.to_dict` and `repo.InMemoryRepo` extras duplication (adapters/sqlalchemy_repo.py L49–60, models.py L40–59, repo.py L111).
+   - Impact: Surprises for consumers swapping adapters/mocks; subtle UI/API mismatches.
+   - Suggested improvement: Define the canonical Account/Profile public shapes and update adapters to match; avoid duplicating data in `extras`.
+   - Effort: Low.
+
+4. Unused import in SQLite repository (Low)
+   - Where: `sqlite_repo.py` imports `hash_password` but does not use it.
+   - Impact: Minor clutter.
+   - Suggested improvement: Remove the unused import.
+   - Effort: Trivial.
+
+### Notes on validation
+
+- Password hashing: `argon2` preferred when available; fallback to `pbkdf2_sha256` (security.py L1–17). `set_password_context` allows runtime override (L18–23).
+- Auth dependency centralization confirmed via `auth_utils.py` and usages in router/middlewares (auth_utils.py L8/L22; router.py L32/L104/L119/L131/L141; middleware.py L44/L90).
+- Repository interface: `get_account_credentials` present in `AuthRepository`; `SQLiteRepository` adopts `MutableAuthRepository` for updates.
+- If desired, router’s defensive lower-casing can remain for robustness despite repo normalization.
+
+No High-impact items remain. Two Medium-impact items remain as outlined above.

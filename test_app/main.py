@@ -17,7 +17,7 @@ for p in (core_pkg, style_pkg, auth_pkg):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from arcadia_ui_core import router as ui_router, attach_ui, mount_ui_static, render_page  # type: ignore
+from arcadia_ui_core import router as ui_router, attach_ui, mount_ui_static, render_page, ActiveProfileMiddleware  # type: ignore
 from arcadia_ui_style import ensure_templates  # type: ignore
 from arcadia_auth import create_auth_router, AuthSettings, mount_cookie_agent_middleware, create_sqlite_repo  # type: ignore
 
@@ -39,8 +39,46 @@ mount_ui_static(app)
 # Optional: still scaffold defaults if you want local files
 # ensure_templates(str(app_dir))
 # Attach UI state so /ui/* endpoints work with the default router
-attach_ui(app, templates, persist_header=True)
+# Provide profile provider/validator so active profile can be resolved and validated
+def _get_account_id(obj):
+    try:
+        return getattr(obj, "id")
+    except Exception:
+        try:
+            return obj.get("id")  # type: ignore[attr-defined]
+        except Exception:
+            return None
+
+def _profile_provider(request: Request, user):
+    acc_id = _get_account_id(user)
+    if acc_id is None:
+        return []
+    try:
+        return _repo.list_profiles(acc_id)
+    except Exception:
+        return []
+
+def _profile_validator(request: Request, user, profile_id: str) -> bool:
+    acc_id = _get_account_id(user)
+    if acc_id is None:
+        return False
+    try:
+        profs = _repo.list_profiles(acc_id)
+        return any(str(p.get("id")) == str(profile_id) for p in profs)
+    except Exception:
+        return False
+
+attach_ui(
+    app,
+    templates,
+    persist_header=True,
+    profile_provider=_profile_provider,
+    profile_validator=_profile_validator,
+)
 app.include_router(ui_router)
+
+# Enable ActiveProfileMiddleware to default the active profile and keep cookie/state in sync
+app.add_middleware(ActiveProfileMiddleware, state=app.state.ui)
 
 # SQLite auth with extended schema support
 _settings = AuthSettings(secret_key="dev-secret")

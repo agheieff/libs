@@ -153,15 +153,16 @@ def create_auth_router(
         sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
         if sub is None:
             raise HTTPException(401, "Invalid token")
-        # Enforce unique profile names per account when enabled
+        # Normalize new display name: strip and trim to 32 chars
+        new_name = (payload.display_name or "").strip()[:32]
+        # Enforce unique profile names per account when enabled (compare against trimmed value)
         if settings.unique_profile_names:
-            new_name = (payload.display_name or "").strip()
             existing = repo.list_profiles(sub)  # type: ignore[arg-type]
             for prof in existing:
                 old_name = (prof.get("display_name") or "").strip()
                 if old_name == new_name:
                     raise HTTPException(status_code=409, detail="Display name already exists")
-        p = repo.create_profile(sub, display_name=payload.display_name, prefs=payload.prefs, extras=payload.extras)  # type: ignore[arg-type]
+        p = repo.create_profile(sub, display_name=new_name if payload.display_name is not None else None, prefs=payload.prefs, extras=payload.extras)  # type: ignore[arg-type]
         return _to_profile_out(p)
 
     @pr.put("/{profile_id}", response_model=ProfileOut)
@@ -176,7 +177,7 @@ def create_auth_router(
             raise HTTPException(400, "Profile updates not supported")
         # Uniqueness check when enabled (ignore current profile)
         if settings.unique_profile_names and (payload.display_name is not None):
-            new_name = (payload.display_name or "").strip()
+            new_name = (payload.display_name or "").strip()[:32]
             if new_name:
                 existing = repo.list_profiles(sub)  # type: ignore[arg-type]
                 for prof in existing:
@@ -187,7 +188,7 @@ def create_auth_router(
                         raise HTTPException(status_code=409, detail="Display name already exists")
         updates: Dict[str, Any] = {}
         if payload.display_name is not None:
-            updates["display_name"] = payload.display_name
+            updates["display_name"] = (payload.display_name or "").strip()[:32]
         if payload.prefs is not None:
             updates["prefs"] = payload.prefs
         if payload.extras is not None:

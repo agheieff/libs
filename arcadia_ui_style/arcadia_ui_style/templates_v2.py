@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Tuple
 
 
-_HEADER_SENTINEL = "<!-- arcadia-ui-style:v1 -->"
+_HEADER_SENTINEL = "<!-- arcadia-ui-style:v2 -->"
 
 
 def _ensure_dirs(app_dir: str) -> Tuple[Path, Path]:
@@ -34,42 +34,6 @@ def _write_header(tdir: Path) -> None:
 {_HEADER_SENTINEL}
 <link rel=\"stylesheet\" href=\"/ui-static/arcadia_theme.css\">\n
 <!-- Shared application header -->
-<style>
-  /* Sticky footer layout: header + content + footer; footer stays at bottom on short pages */
-  html, body {{ height: 100%; }}
-  body {{ min-height: 100vh; display: flex; flex-direction: column; }}
-  #arcadia-content {{ flex: 1 0 auto; }}
-  :root {{ scrollbar-gutter: stable; }}
-  .tm-header, .tm-header *, .tm-header *::before, .tm-header *::after {{ box-sizing: border-box; }}
-  .tm-header {{ background:var(--header-bg, var(--bg)); color:var(--header-fg, var(--fg)); border-bottom:1px solid var(--header-border, var(--border)); font-family: system-ui, -apple-system, Segoe UI, Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif; font-size:14px; line-height:1.25; }}
-  .tm-header .tm-container {{ max-width:1200px; margin:0 auto; padding:0.75rem 1rem; display:flex; align-items:center; justify-content:space-between; }}
-  @media (min-width: 640px){{ .tm-header .tm-container {{ min-height:56px; }} }}
-  .tm-header .tm-brand {{ color:var(--header-fg, var(--fg)); font-weight:600; text-decoration:none; letter-spacing:0.2px; font-size:18px; }}
-  .tm-header .tm-nav a {{ color:var(--link-muted); text-decoration:none; margin-left:1rem; font-size:14px; }}
-  .tm-header .tm-nav a:hover {{ color:var(--link); }}
-  .tm-right {{ display:flex; align-items:center; gap:1rem; }}
-  .tm-actions .tm-btn {{ padding:0.35rem 0.75rem; border:1px solid var(--header-border, var(--border)); border-radius:0.375rem; color:var(--header-fg, var(--fg)); text-decoration:none; font-size:14px; background:transparent; }}
-  .tm-actions .tm-btn:hover {{ background:transparent; }}
-  .tm-actions .tm-primary {{ border-color:var(--primary); background:var(--primary); color:var(--btn-fg, #fff); }}
-  .tm-user {{ position:relative; }}
-  .tm-user-btn {{ padding:0.35rem 0.75rem; border:1px solid var(--header-border, var(--border)); border-radius:0.375rem; color:var(--header-fg, var(--fg)); background:transparent; cursor:pointer; font-size:14px; }}
-  .tm-user-menu {{ position:absolute; right:0; top:2.25rem; background:var(--panel); border:1px solid var(--border); border-radius:0.375rem; min-width:180px; display:none; z-index:50; }}
-  .tm-user:focus-within .tm-user-menu {{ display:block; }}
-  .tm-user-menu a {{ display:block; padding:0.5rem 0.75rem; color:var(--fg); text-decoration:none; font-size:14px; }}
-  .tm-user-menu a:hover {{ background:var(--border); }}
-  .tm-divider {{ width:1px; height:18px; background:var(--border); margin:0 0.5rem; }}
-  .tm-nav a.active {{ color:var(--fg); }}
-  .tm-brand small {{ color:var(--muted); font-weight:400; font-size:12px; margin-left:6px; }}
-  .tm-flex {{ display:flex; align-items:center; gap:.75rem; }}
-  .tm-nav {{ display:flex; align-items:center; }}
-  @media (max-width: 640px){{ .tm-nav a {{ margin-left:.5rem; }} }}
-  .tm-link {{ color:#9ca3af; }}
-  .tm-link:hover {{ color:#f9fafb; }}
-  .tm-hidden {{ display:none; }}
-  .tm-show {{ display:block; }}
-  .tm-menu-right {{ position:relative; }}
-  .tm-user-menu hr {{ border:none; border-top:1px solid #1f2937; margin:4px 0; }}
-</style>
 <header class=\"tm-header t-header\">\n  <div class=\"tm-container\">\n    <a class=\"tm-brand\" href=\"{{ brand_home_url or '/' }}\">\n      {% if brand_logo_url %}<img src=\"{{ brand_logo_url }}\" alt=\"logo\" style=\"height:22px;vertical-align:middle;margin-right:8px;\"/>{% endif %}\n      {{ brand_name or 'Project Name' }}<small>{{ brand_tag or '' }}</small>\n    </a>\n    <div class=\"tm-right\"> \n      {% set _nav = nav_items if (nav_items is defined) else [] %}\n      {% if _nav and _nav|length > 0 %}\n        <nav class=\"tm-nav\" aria-label=\"Primary\"> \n          {% for it in _nav %}\n            <a href=\"{{ it.href }}\" class=\"tm-link{% if it.active %} active{% endif %}\">{{ it.label }}</a>\n          {% endfor %}\n        </nav>\n      {% endif %}\n      {% if request and request.state and request.state.user %} \n        <div class=\"tm-user\" id=\"tm-user\">\n          <button class=\"tm-user-btn\" id=\"tm-user-btn\">Account ▾</button>\n          <div class=\"tm-user-menu\" id=\"tm-user-menu\">\n            <button class=\"tm-menu-trigger\" id=\"theme-menu-trigger\">Theme</button>\n            <div id=\"theme-submenu\" style=\"display:none; position:absolute; right: 100%; top: 0; z-index: 3000;\"></div>\n            <a href=\"/profile\">Profile</a>\n            <a href=\"/settings\">Settings</a>\n            <hr />\n            <a href=\"/auth/logout\">Log out</a>\n          </div>\n        </div>\n      {% else %}\n        <div class=\"tm-actions\">\n          <a href=\"/login\" class=\"tm-btn\">Log in</a>\n          <a href=\"/signup\" class=\"tm-btn tm-primary\">Sign up</a>\n        </div>\n      {% endif %}\n    </div>\n  </div>\n</header>
 <!-- Dropdown uses CSS :focus-within; no JS needed -->
 <script src=\"/ui-static/theme-selector.js\"></script>

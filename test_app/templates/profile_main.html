@@ -73,6 +73,8 @@
       const nameView = document.createElement('div');
       nameView.className = 'name-view';
       nameView.textContent = p.display_name || ('#'+p.id);
+      // Enable context menu on profile name
+      try{ nameView.setAttribute('data-cm','profile'); nameView.dataset.id = String(p.id||''); nameView.dataset.displayName = String(p.display_name||''); }catch{}
       nameView.style.gridColumn = '1';
       const nameEdit = document.createElement('div');
       nameEdit.className = 'name-edit';
@@ -230,6 +232,38 @@
         setTimeout(()=>{ try{ input && input.focus(); }catch{} }, 0);
       });
     }
+
+    // Context-menu event bridges
+    try{
+      window.addEventListener('profile:edit', function(ev){
+        try{
+          var id = ev && ev.detail && (ev.detail.id||ev.detail.profileId||ev.detail.profile_id);
+          if (!id) return;
+          var tr = tbody && tbody.querySelector ? tbody.querySelector('tr[data-id="'+id+'"]') : null;
+          if (tr){ var btn = tr.querySelector('.edit-btn'); if (btn && btn.click) btn.click(); }
+        }catch{}
+      });
+      window.addEventListener('profile:delete', async function(ev){
+        try{
+          var id = ev && ev.detail && (ev.detail.id||ev.detail.profileId||ev.detail.profile_id);
+          if (!id) return;
+          var tr = tbody && tbody.querySelector ? tbody.querySelector('tr[data-id="'+id+'"]') : null;
+          if (!tr) return;
+          let ok = false;
+          try{ if (window.ArcadiaModal && ArcadiaModal.confirm){ ok = await ArcadiaModal.confirm('Delete profile?'); } else { ok = window.confirm('Delete profile?'); } }catch{}
+          if (!ok) return;
+          const res = await fetch('/auth/profiles/'+encodeURIComponent(String(id)), { method:'DELETE' });
+          if(!res.ok){
+            try{ const t = await res.text(); let d={}; try{ d=JSON.parse(t||''); }catch{} const m=(d&&d.detail)||'Delete failed'; toast('error', m); }catch{ toast('error','Delete failed'); }
+            return;
+          }
+          tr.remove();
+          checkEmpty();
+          updateDeleteButtons();
+          try{ window.dispatchEvent(new CustomEvent('profile:deleted',{detail:{profile:{id:id}}})); }catch{}
+        }catch(e){ toast('error','Network error'); }
+      });
+    }catch{}
 
     load();
   })();

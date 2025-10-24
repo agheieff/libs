@@ -18,6 +18,8 @@ for p in (core_pkg, style_pkg, auth_pkg):
         sys.path.insert(0, str(p))
 
 from arcadia_ui_core import router as ui_router, attach_ui, mount_ui_static, render_page, ActiveProfileMiddleware  # type: ignore
+from arcadia_ui_core.contextmenu import ContextMenuRegistry, ContextMenuRequest  # type: ignore
+import json
 from arcadia_ui_style import ensure_templates  # type: ignore
 from arcadia_auth import create_auth_router, AuthSettings, mount_cookie_agent_middleware, create_sqlite_repo  # type: ignore
 
@@ -68,10 +70,48 @@ def _profile_validator(request: Request, user, profile_id: str) -> bool:
     except Exception:
         return False
 
+# Context menu: provide a profile menu with Edit/Delete actions
+cm_registry = ContextMenuRegistry()
+
+def _cm_profile(req: ContextMenuRequest):
+    ds = req.dataset or {}
+    pid = str(ds.get("id", "")).strip()
+    items = []
+    # Edit name via client event
+    if pid:
+        items.append({
+            "id": "cm-edit",
+            "label": "Edit name",
+            "hx": {"get": f"/ui/cm/profile/edit?id={pid}", "target": "#arcadia-content", "swap": "none"},
+        })
+        items.append({"divider": True})
+    # Delete profile via client event; disable when single-profile
+    disable_delete = True
+    try:
+        user = getattr(req, "user", None)
+        acc_id = getattr(user, "id", None)
+        if acc_id is None and isinstance(user, dict):
+            acc_id = user.get("id")
+        profs = _repo.list_profiles(acc_id) if acc_id is not None else []
+        disable_delete = (len(profs) <= 1)
+    except Exception:
+        disable_delete = True
+    items.append({
+        "id": "cm-delete",
+        "label": "Delete profile",
+        "hx": {"get": f"/ui/cm/profile/delete?id={pid}", "target": "#arcadia-content", "swap": "none"},
+        "danger": True,
+        "disabled": (not pid) or disable_delete,
+    })
+    return items
+
+cm_registry.add("profile", _cm_profile)
+
 attach_ui(
     app,
     templates,
     persist_header=True,
+    context_menus=cm_registry,
     profile_provider=_profile_provider,
     profile_validator=_profile_validator,
 )
@@ -108,6 +148,20 @@ def account(request: Request):
 @app.get("/shortcuts", response_class=HTMLResponse)
 def shortcuts(request: Request):
     return render_page(request, templates, content_template="shortcuts_main.html", title="Keyboard Shortcuts", context={})
+
+# Context-menu endpoints that trigger client-side actions via htmx events
+@app.get("/ui/cm/profile/edit")
+def cm_profile_edit(request: Request, id: str):
+    # Trigger a client event to toggle edit mode for this row (hx-swap none)
+    payload = json.dumps({"profile:edit": {"id": id}})
+    return HTMLResponse(content="", status_code=204, headers={"HX-Trigger": payload})
+
+
+@app.get("/ui/cm/profile/delete")
+def cm_profile_delete(request: Request, id: str):
+    # Trigger a client event to initiate delete flow for this row
+    payload = json.dumps({"profile:delete": {"id": id}})
+    return HTMLResponse(content="", status_code=204, headers={"HX-Trigger": payload})
 
 
 if __name__ == "__main__":

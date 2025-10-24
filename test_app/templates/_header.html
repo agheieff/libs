@@ -1,4 +1,6 @@
 
+<!-- Early theme init to avoid flash -->
+<script>(function(){try{var k='arcadia.theme',t=null;try{t=localStorage.getItem(k);}catch(e){} if(!t){try{var m=document.cookie.match(/(?:^|; )theme=([^;]+)/); t=m?decodeURIComponent(m[1]):null;}catch(e){}} if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}var de=document.documentElement;de.classList.add(t==='dark'?'theme-dark':'theme-light','no-theme-transitions');var meta=document.createElement('meta');meta.name='color-scheme';meta.content=(t==='dark')?'dark light':'light dark';document.head.appendChild(meta);document.addEventListener('DOMContentLoaded',function(){de.classList.remove('no-theme-transitions');},{once:true});}catch(e){}})();</script>
 <link rel="stylesheet" href="/ui-static/arcadia_theme.css">
 
 <!-- Shared application header -->
@@ -97,6 +99,10 @@
 <script>
 (function(){
   try{
+    try{
+      document.body.addEventListener('htmx:beforeSwap', function(){ try{ document.documentElement.classList.add('no-theme-transitions'); }catch{} });
+      document.body.addEventListener('htmx:afterSwap', function(){ try{ document.documentElement.classList.remove('no-theme-transitions'); }catch{} });
+    }catch(e){}
     // Update header label when active profile changes
     try{
       if (window.ActiveProfile && window.ActiveProfile.onChange){

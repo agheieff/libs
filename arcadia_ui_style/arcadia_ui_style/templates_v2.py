@@ -31,6 +31,8 @@ def _write_header(tdir: Path) -> None:
         return
     header.write_text(
         _HEADER_SENTINEL + """
+<!-- Early theme init to avoid flash -->
+<script>(function(){try{var k='arcadia.theme',t=null;try{t=localStorage.getItem(k);}catch(e){} if(!t){try{var m=document.cookie.match(/(?:^|; )theme=([^;]+)/); t=m?decodeURIComponent(m[1]):null;}catch(e){}} if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}var de=document.documentElement;de.classList.add(t==='dark'?'theme-dark':'theme-light','no-theme-transitions');var meta=document.createElement('meta');meta.name='color-scheme';meta.content=(t==='dark')?'dark light':'light dark';document.head.appendChild(meta);document.addEventListener('DOMContentLoaded',function(){de.classList.remove('no-theme-transitions');},{once:true});}catch(e){}})();</script>
 <link rel=\"stylesheet\" href=\"/ui-static/arcadia_theme.css\">\n
 <!-- Shared application header -->
 <header class=\"tm-header t-header\">\n  <div class=\"tm-container\">\n    <a class=\"tm-brand\" href=\"{{ brand_home_url or '/' }}\">\n      {% if brand_logo_url %}<img src=\"{{ brand_logo_url }}\" alt=\"logo\" style=\"height:22px;vertical-align:middle;margin-right:8px;\"/>{% endif %}\n      {{ brand_name or 'Project Name' }}<small>{{ brand_tag or '' }}</small>\n    </a>\n    <div class=\"tm-right\"> \n      {% set _nav = nav_items if (nav_items is defined) else [] %}\n      {% if _nav and _nav|length > 0 %}\n        <nav class=\"tm-nav\" aria-label=\"Primary\"> \n          {% for it in _nav %}\n            <a href=\"{{ it.href }}\" class=\"tm-link{% if it.active %} active{% endif %}\">{{ it.label }}</a>\n          {% endfor %}\n        </nav>\n      {% endif %}\n      {% if request and request.state and request.state.user %} \n        <div class=\"tm-user\" id=\"tm-user\">\n          <button class=\"tm-user-btn\" id=\"tm-user-btn\">Account ▾</button>\n          <div class=\"tm-user-menu\" id=\"tm-user-menu\">\n            <button class=\"tm-menu-trigger\" id=\"theme-menu-trigger\">Theme</button>\n            <div id=\"theme-submenu\" style=\"display:none; position:absolute; right: 100%; top: 0; z-index: 3000;\"></div>\n            <a href=\"/profile\">Profile</a>\n            <a href=\"/account\">Account</a>\n            <a href=\"/settings\">Settings</a>\n            <hr />\n            <a href=\"/auth/logout\">Log out</a>\n          </div>\n        </div>\n      {% else %}\n        <div class=\"tm-actions\">\n          <a href=\"/login\" class=\"tm-btn\">Log in</a>\n          <a href=\"/signup\" class=\"tm-btn tm-primary\">Sign up</a>\n        </div>\n      {% endif %}\n    </div>\n  </div>\n</header>
@@ -57,6 +59,10 @@ def _write_header(tdir: Path) -> None:
 <script>
 (function(){
   try{
+    try{
+      document.body.addEventListener('htmx:beforeSwap', function(){ try{ document.documentElement.classList.add('no-theme-transitions'); }catch{} });
+      document.body.addEventListener('htmx:afterSwap', function(){ try{ document.documentElement.classList.remove('no-theme-transitions'); }catch{} });
+    }catch(e){}
     function fire(){
       try{ window.dispatchEvent(new CustomEvent('ui:reinit')); }catch(e){}
     }

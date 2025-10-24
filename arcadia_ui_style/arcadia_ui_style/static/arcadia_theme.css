@@ -75,6 +75,11 @@
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
+/* Disable transitions during early theme apply or swaps */
+html.no-theme-transitions, html.no-theme-transitions * {
+  transition: none !important;
+}
+
 /* Theme selector styles */
 .tm-menu-trigger {
   width: 100%;

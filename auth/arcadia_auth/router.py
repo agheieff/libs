@@ -137,6 +137,14 @@ def create_auth_router(
         sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
         if sub is None:
             raise HTTPException(401, "Invalid token")
+        # Enforce unique profile names per account when enabled
+        if settings.unique_profile_names:
+            new_name = (payload.display_name or "").strip()
+            existing = repo.list_profiles(sub)  # type: ignore[arg-type]
+            for prof in existing:
+                old_name = (prof.get("display_name") or "").strip()
+                if old_name == new_name:
+                    raise HTTPException(status_code=409, detail="Display name already exists")
         p = repo.create_profile(sub, display_name=payload.display_name, prefs=payload.prefs, extras=payload.extras)  # type: ignore[arg-type]
         return _to_profile_out(p)
 

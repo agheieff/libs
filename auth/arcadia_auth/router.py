@@ -205,6 +205,10 @@ def create_auth_router(
         sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
         if sub is None:
             raise HTTPException(401, "Invalid token")
+        # Prevent deleting the last remaining profile for the account
+        profs = repo.list_profiles(sub)  # type: ignore[arg-type]
+        if len(profs) <= 1:
+            raise HTTPException(400, "Cannot delete last profile")
         repo.delete_profile(sub, profile_id)  # type: ignore[arg-type]
         return {"ok": True}
 

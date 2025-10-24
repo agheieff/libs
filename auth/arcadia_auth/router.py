@@ -73,9 +73,13 @@ def create_auth_router(
         if msg:
             raise HTTPException(status_code=422, detail=msg)
         acc = repo.create_account(email, hash_password(payload.password), name=payload.name)
-        # auto-create default profile when single-profile mode
-        if not settings.multi_profile:
-            repo.create_profile(acc["id"], display_name=(payload.name or email.split("@")[0]), prefs=None, extras=None)
+        # Always auto-create a default profile; display_name falls back to email prefix when name not provided
+        repo.create_profile(
+            acc["id"],
+            display_name=(payload.name or email.split("@")[0]),
+            prefs=None,
+            extras=None,
+        )
         return _to_account_out(acc)
 
     @r.post("/login", response_model=TokenOut)

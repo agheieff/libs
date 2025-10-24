@@ -327,6 +327,7 @@ def _resolve_user_menu_items(user: Any, state: Optional[UIState]) -> List[Dict[s
     if user:
         return [
             {"label": "Profile", "href": "/profile"},
+            {"label": "Account", "href": "/account"},
             {"label": "Settings", "href": "/settings"},
             {"divider": True},
             {"label": "Log out", "href": "/auth/logout"},

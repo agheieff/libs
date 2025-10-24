@@ -10,6 +10,7 @@ from .security import hash_password, verify_password, create_access_token
 from .auth_utils import parse_bearer_token, extract_subject
 from .repo import AuthRepository
 from .policy import validate_password
+from .repo import MutableAuthRepository
 
 
 @dataclass
@@ -162,6 +163,39 @@ def create_auth_router(
                     raise HTTPException(status_code=409, detail="Display name already exists")
         p = repo.create_profile(sub, display_name=payload.display_name, prefs=payload.prefs, extras=payload.extras)  # type: ignore[arg-type]
         return _to_profile_out(p)
+
+    @pr.put("/{profile_id}", response_model=ProfileOut)
+    def update_my_profile(profile_id: str, payload: ProfileCreate, authorization: Optional[str] = Depends(_auth_header)):
+        if not authorization:
+            raise HTTPException(401, "Not authenticated")
+        sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
+        if sub is None:
+            raise HTTPException(401, "Invalid token")
+        # Ensure repo supports updates
+        if not isinstance(repo, MutableAuthRepository):
+            raise HTTPException(400, "Profile updates not supported")
+        # Uniqueness check when enabled (ignore current profile)
+        if settings.unique_profile_names and (payload.display_name is not None):
+            new_name = (payload.display_name or "").strip()
+            if new_name:
+                existing = repo.list_profiles(sub)  # type: ignore[arg-type]
+                for prof in existing:
+                    if str(prof.get("id")) == str(profile_id):
+                        continue
+                    old_name = (prof.get("display_name") or "").strip()
+                    if old_name == new_name:
+                        raise HTTPException(status_code=409, detail="Display name already exists")
+        updates: Dict[str, Any] = {}
+        if payload.display_name is not None:
+            updates["display_name"] = payload.display_name
+        if payload.prefs is not None:
+            updates["prefs"] = payload.prefs
+        if payload.extras is not None:
+            updates["extras"] = payload.extras
+        updated = repo.update_profile(sub, profile_id, **updates)  # type: ignore[arg-type]
+        if not updated:
+            raise HTTPException(404, "Profile not found")
+        return _to_profile_out(updated)
 
     @pr.delete("/{profile_id}")
     def delete_my_profile(profile_id: str, authorization: Optional[str] = Depends(_auth_header)):

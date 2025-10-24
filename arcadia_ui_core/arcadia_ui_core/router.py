@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from typing import Optional, Dict, Any, List, Callable
 from dataclasses import dataclass
 from starlette.templating import Jinja2Templates
+from jinja2 import TemplateNotFound
 
 
 @dataclass
@@ -142,7 +143,7 @@ def ui_auth_modal(request: Request):
     # Optional template; return 204 if missing
     try:
         return state.templates.TemplateResponse("_auth.html", ctx)
-    except Exception:
+    except TemplateNotFound:
         return HTMLResponse("", status_code=204)
 
 
@@ -158,7 +159,7 @@ def ui_settings(request: Request):
     }
     try:
         return state.templates.TemplateResponse("_settings.html", ctx)
-    except Exception:
+    except TemplateNotFound:
         return HTMLResponse("", status_code=204)
 
 
@@ -170,7 +171,7 @@ def login_page(request: Request):
     ctx = {"request": request}
     try:
         return state.templates.TemplateResponse("login.html", ctx)
-    except Exception:
+    except TemplateNotFound:
         return HTMLResponse("Login page not available", status_code=404)
 
 
@@ -182,7 +183,7 @@ def signup_page(request: Request):
     ctx = {"request": request}
     try:
         return state.templates.TemplateResponse("signup.html", ctx)
-    except Exception:
+    except TemplateNotFound:
         return HTMLResponse("Signup page not available", status_code=404)
 
 
@@ -193,29 +194,29 @@ def mount_ui_static(app):
     """
     try:
         import arcadia_ui_style as _style  # type: ignore
-        from pathlib import Path as _Path
-        _root = _Path(_style.__file__).resolve().parent
-        _static = _root / "static"
-        if _static.exists():
-            app.mount("/ui-static", StaticFiles(directory=str(_static)), name="ui-static")
-    except Exception:
-        pass
+    except ImportError:
+        return
+    from pathlib import Path as _Path
+    _root = _Path(_style.__file__).resolve().parent
+    _static = _root / "static"
+    if _static.exists():
+        app.mount("/ui-static", StaticFiles(directory=str(_static)), name="ui-static")
 
 
 def _template_exists(templates, name: str) -> bool:
+    if not name:
+        return False
     try:
-        if not name:
-            return False
         templates.env.get_template(name)
         return True
-    except Exception:
+    except TemplateNotFound:
         return False
 
 
 def _render_subtemplate(templates, name: str, ctx: Dict[str, Any]) -> str:
     try:
         return templates.env.get_template(name).render(ctx)
-    except Exception:
+    except TemplateNotFound:
         return ""
 
 
@@ -247,7 +248,7 @@ def render_page(
         if _template_exists(templates, wrapper_template):
             try:
                 return templates.TemplateResponse(wrapper_template, base, status_code=status_code)
-            except Exception:
+            except TemplateNotFound:
                 pass
         # Fallback: render content and wrap with #arcadia-content; include OOB title
         body = _render_subtemplate(templates, content_template, base)
@@ -258,7 +259,7 @@ def render_page(
     if _template_exists(templates, layout_template):
         try:
             return templates.TemplateResponse(layout_template, base, status_code=status_code)
-        except Exception:
+        except TemplateNotFound:
             pass
     # Minimal fallback full page
     body = _render_subtemplate(templates, content_template, base)
@@ -315,14 +316,11 @@ def _resolve_user_menu_items(user: Any, state: Optional[UIState]) -> List[Dict[s
     except Exception:
         pass
     # Then globals
-    try:
-        if state:
-            gi = getattr(state.templates.env, "globals", {})  # type: ignore[attr-defined]
-            items = gi.get("user_menu_items")
-            if items:
-                return list(items)
-    except Exception:
-        pass
+    if state:
+        gi = getattr(state.templates.env, "globals", {})  # type: ignore[attr-defined]
+        items = gi.get("user_menu_items")
+        if items:
+            return list(items)
     # Defaults
     if user:
         return [
@@ -348,7 +346,7 @@ def ui_user_menu(request: Request):
     ctx = {"request": request, "user_menu_items": _resolve_user_menu_items(user, state)}
     try:
         return state.templates.TemplateResponse("_user_menu.html", ctx)
-    except Exception:
+    except TemplateNotFound:
         return HTMLResponse("", status_code=204)
 
 
@@ -374,7 +372,7 @@ def create_ui_router(state: UIState) -> APIRouter:
         ctx = {"request": request}
         try:
             return state.templates.TemplateResponse("_auth.html", ctx)
-        except Exception:
+        except TemplateNotFound:
             return HTMLResponse("", status_code=204)
 
     @r.get("/ui/settings", response_class=HTMLResponse)
@@ -386,7 +384,7 @@ def create_ui_router(state: UIState) -> APIRouter:
         }
         try:
             return state.templates.TemplateResponse("_settings.html", ctx)
-        except Exception:
+        except TemplateNotFound:
             return HTMLResponse("", status_code=204)
 
     @r.get("/login", response_class=HTMLResponse)
@@ -394,7 +392,7 @@ def create_ui_router(state: UIState) -> APIRouter:
         ctx = {"request": request}
         try:
             return state.templates.TemplateResponse("login.html", ctx)
-        except Exception:
+        except TemplateNotFound:
             return HTMLResponse("Login page not available", status_code=404)
 
     @r.get("/signup", response_class=HTMLResponse)
@@ -402,7 +400,7 @@ def create_ui_router(state: UIState) -> APIRouter:
         ctx = {"request": request}
         try:
             return state.templates.TemplateResponse("signup.html", ctx)
-        except Exception:
+        except TemplateNotFound:
             return HTMLResponse("Signup page not available", status_code=404)
 
     @r.get("/ui/user_menu", response_class=HTMLResponse)
@@ -411,7 +409,7 @@ def create_ui_router(state: UIState) -> APIRouter:
         ctx = {"request": request, "user_menu_items": _resolve_user_menu_items(user, state)}
         try:
             return state.templates.TemplateResponse("_user_menu.html", ctx)
-        except Exception:
+        except TemplateNotFound:
             return HTMLResponse("", status_code=204)
 
     return r

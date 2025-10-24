@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session, sessionmaker
-from .repo import AuthRepository
+from .repo import AuthRepository, MutableAuthRepository
 from .models import Account, Profile, create_sqlite_engine, create_tables
 from .security import hash_password
 
 
-class SQLiteRepository(AuthRepository):
+class SQLiteRepository(MutableAuthRepository):
     """SQLite implementation of AuthRepository with extensible schema support."""
     
     def __init__(self, database_url: str = "sqlite:///arcadia_auth.db", echo: bool = False):

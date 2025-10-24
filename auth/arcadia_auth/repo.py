@@ -35,6 +35,20 @@ class AuthRepository(ABC):
     def delete_profile(self, account_id: str | int, profile_id: str | int) -> None: ...
 
 
+class MutableAuthRepository(AuthRepository, ABC):
+    """Optional extension for repositories that support updates.
+
+    Implementations may choose to provide update methods; callers can use
+    isinstance(repo, MutableAuthRepository) to detect support.
+    """
+
+    @abstractmethod
+    def update_account(self, account_id: str | int, **updates) -> Optional[Dict[str, Any]]: ...
+
+    @abstractmethod
+    def update_profile(self, account_id: str | int, profile_id: str | int, **updates) -> Optional[Dict[str, Any]]: ...
+
+
 class InMemoryRepo(AuthRepository):
     """Simple in-memory store for testing.
 
@@ -93,6 +107,7 @@ class InMemoryRepo(AuthRepository):
             "is_verified": True,
             "role": None,
             "subscription_tier": None,
+            "name": name,
             "extras": {"name": name} if name else None,
         }
         self.accounts[aid] = acc

@@ -1,0 +1,17 @@
+<main style="max-width:960px;margin:24px auto;padding:0 16px;">
+  <h1 class="t-fg" style="margin:0 0 12px;">Account</h1>
+  <div class="t-panel" style="margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:6px;">
+    <h2 style="margin:0 0 12px;font-size:18px;">Email</h2>
+    <p id="acct-email" class="t-fg" style="margin:8px 0;">Loading…</p>
+  </div>
+  <script>
+  (async function(){
+    try{
+      const res = await fetch('/auth/me');
+      if(!res.ok){ document.getElementById('acct-email').textContent = 'Not authenticated.'; return; }
+      const data = await res.json();
+      document.getElementById('acct-email').textContent = data.email || '(unknown)';
+    }catch(e){ document.getElementById('acct-email').textContent = 'Error loading.'; }
+  })();
+  </script>
+</main>

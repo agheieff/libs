@@ -56,11 +56,16 @@ def index(request: Request):
 @app.get("/profile", response_class=HTMLResponse)
 def profile(request: Request):
     agent = getattr(request.state, "agent", None) or getattr(request.state, "user", None)
-    return render_page(request, templates, content_template="profile_main.html", title="Profile", context={"agent": agent})
+    # Reflect app's multi_profile setting to the template
+    return render_page(request, templates, content_template="profile_main.html", title="Profile", context={"agent": agent, "multi_profile": getattr(_settings, "multi_profile", True)})
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings(request: Request):
     return render_page(request, templates, content_template="settings_main.html", title="Settings", context={})
+
+@app.get("/account", response_class=HTMLResponse)
+def account(request: Request):
+    return render_page(request, templates, content_template="account_main.html", title="Account", context={})
 
 
 if __name__ == "__main__":

@@ -7,7 +7,54 @@
   {% endif %}
 
   <div class="t-panel" style="margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:6px;">
-    <h2 style="margin:0 0 12px;font-size:18px;">Profile Settings</h2>
-    <p style="margin:8px 0;color:var(--muted);">Your user profile information and preferences.</p>
+    <h2 style="margin:0 0 12px;font-size:18px;">{{ 'Profiles' if multi_profile else 'Profile Info' }}</h2>
+    <div id="profile-content" class="t-fg" style="font-size:14px;">
+      Loading…
+    </div>
+    {% if multi_profile %}
+    <form id="add-profile" style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+      <input id="display_name" placeholder="New profile name" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:4px; background:var(--panel); color:var(--fg);"/>
+      <button class="t-btn" type="submit" style="padding:6px 10px;">Add</button>
+    </form>
+    <div id="prof-msg" class="t-muted" style="margin-top:8px;"></div>
+    {% endif %}
   </div>
+
+  <script>
+  (function(){
+    const MULTI = {{ 'true' if multi_profile else 'false' }};
+    const content = document.getElementById('profile-content');
+    const msg = document.getElementById('prof-msg');
+    function setMsg(t, ok){ if(!msg) return; msg.textContent=t||''; msg.style.color = ok? 'var(--fg)':'#b91c1c'; }
+    function renderList(list){
+      if(!Array.isArray(list)) { content.textContent = 'Error.'; return; }
+      if(!list.length){ content.textContent = 'No profiles yet.'; return; }
+      const ul = document.createElement('ul'); ul.style.listStyle='none'; ul.style.padding='0'; ul.style.margin='0';
+      list.forEach(p=>{ const li=document.createElement('li'); li.style.padding='6px 0'; li.textContent = p.display_name || ('#'+p.id); ul.appendChild(li); });
+      content.innerHTML=''; content.appendChild(ul);
+    }
+    async function load(){
+      try{
+        const res = await fetch('/auth/profiles/');
+        if(!res.ok){ content.textContent = 'Not authenticated.'; return; }
+        const data = await res.json();
+        if(MULTI){ renderList(data); } else { const p = data[0]; content.textContent = p ? (p.display_name||'') : '(no profile)'; }
+      }catch(e){ content.textContent = 'Error loading.'; }
+    }
+    load();
+    const form = document.getElementById('add-profile');
+    if(form){
+      form.addEventListener('submit', async (e)=>{
+        e.preventDefault(); setMsg('');
+        const name = (document.getElementById('display_name').value||'').trim();
+        if(!name){ setMsg('Enter a name', false); return; }
+        try{
+          const res = await fetch('/auth/profiles/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ display_name: name, prefs: null, extras: null }) });
+          if(!res.ok){ const t = await res.text(); setMsg((JSON.parse(t).detail)||'Error creating', false); return; }
+          setMsg('Created', true); (document.getElementById('display_name').value=''); load();
+        }catch(e){ setMsg('Network error', false); }
+      });
+    }
+  })();
+  </script>
 </main>

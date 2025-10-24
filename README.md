@@ -2,6 +2,8 @@
 
 Lightweight Python libraries for FastAPI apps (UI, auth, integrations) plus utilities. Each subfolder is an installable package intended for local development.
 
+### Everything is in active development, and very unstable, there is no stable version, don't use it
+
 ## Packages
 - arcadia_ui_core — Core UI building blocks for FastAPI: Jinja2 template mounting, UI endpoints (header/footer/auth/settings/user_menu), ThemeManager, and static mounting helper.
 - arcadia_ui_style — Opinionated theme and default templates; ensure_templates scaffolds header/footer, login/signup, settings, and generates arcadia_theme.css; depends on arcadia_ui_core.

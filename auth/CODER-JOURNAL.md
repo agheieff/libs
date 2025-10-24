@@ -39,3 +39,9 @@ Commit: 9cdfb94
 Change: G) Always create a default profile on account registration; display_name falls back to email prefix when name is not provided.
 Files: auth/arcadia_auth/router.py
 Commit: 252c298
+ 
+2025-10-24
+
+Change: H) Enforce unique profile names per account when enabled; return 409 for duplicate display_name.
+Files: auth/arcadia_auth/router.py
+Commit: 4e245c8

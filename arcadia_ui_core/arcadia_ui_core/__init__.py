@@ -10,6 +10,7 @@ from .router import (
     UIState,
 )
 from .theme import ThemeManager, Theme
+from .contextmenu import ContextMenuRegistry, ContextMenuRequest, MenuItem
 
 __all__ = [
     "router",
@@ -20,6 +21,9 @@ __all__ = [
     "UIState",
     "ThemeManager",
     "Theme",
+    "ContextMenuRegistry",
+    "ContextMenuRequest",
+    "MenuItem",
     "mount_ui_static",
     "render_page",
     "render_composed_page",

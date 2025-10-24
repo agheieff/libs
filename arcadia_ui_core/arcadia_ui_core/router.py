@@ -7,6 +7,10 @@ from typing import Optional, Dict, Any, List, Callable
 from dataclasses import dataclass
 from starlette.templating import Jinja2Templates
 from jinja2 import TemplateNotFound
+import base64
+import json
+
+from .contextmenu import ContextMenuRegistry, ContextMenuRequest
 
 
 @dataclass
@@ -19,6 +23,7 @@ class UIState:
 
     templates: Jinja2Templates
     user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None
+    context_menus: Optional[ContextMenuRegistry] = None
 
 
 def mount_templates(
@@ -34,6 +39,7 @@ def mount_templates(
     nav_items: Optional[List[Dict[str, Any]]] = None,
     user_menu_items: Optional[List[Dict[str, Any]]] = None,
     user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None,
+    context_menus: Optional[ContextMenuRegistry] = None,
 ):
     """Configure provided Jinja templates with globals.
 
@@ -60,7 +66,7 @@ def mount_templates(
     if user_menu_items is not None:
         gi["user_menu_items"] = user_menu_items
 
-    return UIState(templates=templates, user_menu_provider=user_menu_provider)
+    return UIState(templates=templates, user_menu_provider=user_menu_provider, context_menus=context_menus)
 
 
 def attach_ui(
@@ -77,6 +83,7 @@ def attach_ui(
     nav_items: Optional[List[Dict[str, Any]]] = None,
     user_menu_items: Optional[List[Dict[str, Any]]] = None,
     user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None,
+    context_menus: Optional[ContextMenuRegistry] = None,
 ) -> UIState:
     """Attach UI state to app.state.ui and configure template globals.
 
@@ -94,6 +101,7 @@ def attach_ui(
         nav_items=nav_items,
         user_menu_items=user_menu_items,
         user_menu_provider=user_menu_provider,
+        context_menus=context_menus,
     )
     # Attach to app.state for request-time access
     setattr(app.state, "ui", state)
@@ -342,6 +350,93 @@ def ui_user_menu(request: Request):
     state: Optional[UIState] = getattr(request.app.state, "ui", None)
     if not state:
         return HTMLResponse("", status_code=204)
+
+
+def _build_context_menu_html(items: List[Dict[str, Any]], name: str) -> str:
+    if not items:
+        return ""
+    out: List[str] = [f'<div class="t-cm" role="menu" data-name="{name}">']
+    for it in items:
+        if it.get("divider"):
+            out.append('<hr class="t-cm-divider" />')
+            continue
+        label = it.get("label", "")
+        classes = ["t-cm-item"]
+        if it.get("disabled"):
+            classes.append("is-disabled")
+        if it.get("danger"):
+            classes.append("is-danger")
+        cls = " ".join(classes)
+
+        attrs: List[str] = [f'class="{cls}"', 'role="menuitem"']
+        if it.get("id"):
+            attrs.append(f'id="{it["id"]}"')
+        target = it.get("target")
+        if target:
+            attrs.append(f'target="{target}"')
+
+        hx = it.get("hx") or {}
+        href = it.get("href")
+        disabled = bool(it.get("disabled"))
+
+        if disabled:
+            # Render as a non-interactive button (disabled)
+            out.append(f'<button {" ".join(attrs)} disabled>{label}</button>')
+        elif href:
+            # Simple navigation
+            attrs.append(f'href="{href}"')
+            out.append(f'<a {" ".join(attrs)}>{label}</a>')
+        elif hx:
+            # htmx action
+            for k, v in hx.items():
+                k2 = k.replace("_", "-")
+                attrs.append(f'hx-{k2}="{v}"')
+            out.append(f'<button {" ".join(attrs)}>{label}</button>')
+        else:
+            # Fallback inert button
+            out.append(f'<button {" ".join(attrs)}>{label}</button>')
+    out.append("</div>")
+    return "".join(out)
+
+
+@router.get("/ui/context-menu", response_class=HTMLResponse)
+def ui_context_menu(request: Request, name: str, path: Optional[str] = None, element_id: Optional[str] = None):
+    state: Optional[UIState] = getattr(request.app.state, "ui", None)
+    if not state or not state.context_menus:
+        return HTMLResponse("", status_code=204)
+    provider = state.context_menus.get(name)
+    if not provider:
+        return HTMLResponse("", status_code=204)
+
+    dataset: Dict[str, str] = {}
+    sel: Optional[str] = None
+    # Headers carry dataset/selection (base64 JSON)
+    ds_hdr = request.headers.get("X-CM-Dataset")
+    if ds_hdr:
+        try:
+            payload = base64.b64decode(ds_hdr.encode("utf-8"))
+            dataset = json.loads(payload.decode("utf-8"))
+            if not isinstance(dataset, dict):
+                dataset = {}
+        except Exception:
+            dataset = {}
+    sel = request.headers.get("X-CM-Selection")
+
+    cm_req = ContextMenuRequest(
+        dataset=dataset,
+        selection=sel,
+        path=path,
+        element_id=element_id,
+        user=getattr(request.state, "user", None),
+    )
+    try:
+        items = provider(cm_req) or []
+    except Exception:
+        items = []
+    if not items:
+        return HTMLResponse("", status_code=204)
+    html = _build_context_menu_html(items, name)
+    return HTMLResponse(html)
     user = getattr(request.state, "user", None)
     ctx = {"request": request, "user_menu_items": _resolve_user_menu_items(user, state)}
     try:
@@ -411,5 +506,40 @@ def create_ui_router(state: UIState) -> APIRouter:
             return state.templates.TemplateResponse("_user_menu.html", ctx)
         except TemplateNotFound:
             return HTMLResponse("", status_code=204)
+
+    @r.get("/ui/context-menu", response_class=HTMLResponse)
+    def _context_menu(request: Request, name: str, path: Optional[str] = None, element_id: Optional[str] = None):
+        if not state.context_menus:
+            return HTMLResponse("", status_code=204)
+        provider = state.context_menus.get(name)
+        if not provider:
+            return HTMLResponse("", status_code=204)
+
+        dataset: Dict[str, str] = {}
+        ds_hdr = request.headers.get("X-CM-Dataset")
+        if ds_hdr:
+            try:
+                payload = base64.b64decode(ds_hdr.encode("utf-8"))
+                dataset = json.loads(payload.decode("utf-8"))
+                if not isinstance(dataset, dict):
+                    dataset = {}
+            except Exception:
+                dataset = {}
+        sel = request.headers.get("X-CM-Selection")
+        cm_req = ContextMenuRequest(
+            dataset=dataset,
+            selection=sel,
+            path=path,
+            element_id=element_id,
+            user=getattr(request.state, "user", None),
+        )
+        try:
+            items = provider(cm_req) or []
+        except Exception:
+            items = []
+        if not items:
+            return HTMLResponse("", status_code=204)
+        html = _build_context_menu_html(items, name)
+        return HTMLResponse(html)
 
     return r

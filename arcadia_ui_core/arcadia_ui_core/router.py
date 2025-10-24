@@ -131,6 +131,22 @@ def mount_templates(
             return None
     templates.env.globals["active_profile_id"] = _active_profile_id
 
+    # Expose active_profile_name(request) helper using profile_provider if available
+    def _active_profile_name(request: Request) -> Optional[str]:
+        try:
+            apid = getattr(request.state, "active_profile_id", None)
+            if not apid:
+                return None
+            if state.profile_provider and getattr(request.state, "user", None) is not None:
+                profs = state.profile_provider(request, getattr(request.state, "user", None)) or []
+                for p in profs:
+                    if str(p.get("id")) == str(apid):
+                        return p.get("display_name")
+        except Exception:
+            pass
+        return None
+    templates.env.globals["active_profile_name"] = _active_profile_name
+
     return state
 
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Request, Body
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from typing import Optional, Dict, Any, List, Callable
 from dataclasses import dataclass
 from starlette.templating import Jinja2Templates
 from jinja2 import TemplateNotFound
+from starlette.middleware.base import BaseHTTPMiddleware
 import base64
 import json
 import html
@@ -25,8 +26,15 @@ class UIState:
     templates: Jinja2Templates
     user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None
     context_menus: Optional[ContextMenuRegistry] = None
+    # i18n
     translations: Optional[Dict[str, Dict[str, str]]] = None
     locale: Optional[str] = "en"
+    # active profile support
+    active_profile_cookie: str = "active_profile"
+    # Provider returns list of profiles (dicts with at least id, display_name) for current user
+    profile_provider: Optional[Callable[[Request, Any], List[Dict[str, Any]]]] = None
+    # Validator checks if a profile id belongs to current user
+    profile_validator: Optional[Callable[[Request, Any, str], bool]] = None
 
 
 def mount_templates(
@@ -45,6 +53,10 @@ def mount_templates(
     context_menus: Optional[ContextMenuRegistry] = None,
     translations: Optional[Dict[str, Dict[str, str]]] = None,
     locale: Optional[str] = "en",
+    # active profile
+    active_profile_cookie: str = "active_profile",
+    profile_provider: Optional[Callable[[Request, Any], List[Dict[str, Any]]]] = None,
+    profile_validator: Optional[Callable[[Request, Any, str], bool]] = None,
 ):
     """Configure provided Jinja templates with globals.
 
@@ -77,6 +89,9 @@ def mount_templates(
         context_menus=context_menus,
         translations=translations,
         locale=locale,
+        active_profile_cookie=active_profile_cookie,
+        profile_provider=profile_provider,
+        profile_validator=profile_validator,
     )
 
     # Inject a minimal button helper returning class strings
@@ -108,6 +123,14 @@ def mount_templates(
 
     templates.env.globals["t"] = t
 
+    # Expose active_profile_id(request) helper
+    def _active_profile_id(request: Request) -> Optional[str]:
+        try:
+            return getattr(request.state, "active_profile_id", None)
+        except Exception:
+            return None
+    templates.env.globals["active_profile_id"] = _active_profile_id
+
     return state
 
 
@@ -128,6 +151,9 @@ def attach_ui(
     context_menus: Optional[ContextMenuRegistry] = None,
     translations: Optional[Dict[str, Dict[str, str]]] = None,
     locale: Optional[str] = "en",
+    active_profile_cookie: str = "active_profile",
+    profile_provider: Optional[Callable[[Request, Any], List[Dict[str, Any]]]] = None,
+    profile_validator: Optional[Callable[[Request, Any, str], bool]] = None,
 ) -> UIState:
     """Attach UI state to app.state.ui and configure template globals.
 
@@ -148,6 +174,9 @@ def attach_ui(
         context_menus=context_menus,
         translations=translations,
         locale=locale,
+        active_profile_cookie=active_profile_cookie,
+        profile_provider=profile_provider,
+        profile_validator=profile_validator,
     )
     # Attach to app.state for request-time access
     setattr(app.state, "ui", state)
@@ -169,6 +198,63 @@ def safe_label(text: Any) -> str:
         return ""
     # Text node content; escape HTML metacharacters
     return html.escape(str(text), quote=False)
+
+
+class ActiveProfileMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, *, state: Optional[UIState] = None):
+        super().__init__(app)
+        self.state = state
+
+    async def dispatch(self, request: Request, call_next):
+        state = self.state
+        user = getattr(request.state, "user", None)
+        current_id: Optional[str] = None
+        changed = False
+        if user is not None and state is not None:
+            cookie_name = state.active_profile_cookie or "active_profile"
+            # Read cookie
+            try:
+                current_id = request.cookies.get(cookie_name)
+            except Exception:
+                current_id = None
+            # Validate
+            valid = False
+            if current_id:
+                try:
+                    if state.profile_validator:
+                        valid = bool(state.profile_validator(request, user, str(current_id)))
+                    elif state.profile_provider:
+                        profs = state.profile_provider(request, user) or []
+                        valid = any(str(p.get("id")) == str(current_id) for p in profs)
+                    else:
+                        valid = True
+                except Exception:
+                    valid = False
+            if not current_id or not valid:
+                # Pick default
+                try:
+                    if state.profile_provider:
+                        profs = state.profile_provider(request, user) or []
+                        if profs:
+                            current_id = str(profs[0].get("id"))
+                            changed = True
+                except Exception:
+                    pass
+            try:
+                setattr(request.state, "active_profile_id", current_id)
+            except Exception:
+                pass
+
+        response = await call_next(request)
+        # Write cookie if changed
+        if (user is not None) and (self.state is not None):
+            cookie_name = self.state.active_profile_cookie or "active_profile"
+            if changed and current_id:
+                try:
+                    response.set_cookie(cookie_name, current_id, path="/", samesite="lax")
+                except Exception:
+                    pass
+        return response
 
 
 def mount_templates_personal(templates):
@@ -410,6 +496,12 @@ def ui_user_menu(request: Request):
     state: Optional[UIState] = getattr(request.app.state, "ui", None)
     if not state:
         return HTMLResponse("", status_code=204)
+    user = getattr(request.state, "user", None)
+    ctx = {"request": request, "user_menu_items": _resolve_user_menu_items(user, state)}
+    try:
+        return state.templates.TemplateResponse("_user_menu.html", ctx)
+    except TemplateNotFound:
+        return HTMLResponse("", status_code=204)
 
 
 def _build_context_menu_html(items: List[Dict[str, Any]], name: str) -> str:
@@ -584,6 +676,100 @@ def create_ui_router(state: UIState) -> APIRouter:
             return state.templates.TemplateResponse("_user_menu.html", ctx)
         except TemplateNotFound:
             return HTMLResponse("", status_code=204)
+
+    @r.get("/ui/active-profile")
+    def _active_profile_get(request: Request):
+        apid = getattr(request.state, "active_profile_id", None)
+        if not apid:
+            return Response(status_code=204)
+        name: Optional[str] = None
+        try:
+            if state.profile_provider and getattr(request.state, "user", None) is not None:
+                profs = state.profile_provider(request, getattr(request.state, "user", None)) or []
+                for p in profs:
+                    if str(p.get("id")) == str(apid):
+                        name = p.get("display_name")
+                        break
+        except Exception:
+            pass
+        return JSONResponse({"id": apid, "name": name})
+
+    @r.post("/ui/active-profile")
+    def _active_profile_set(request: Request, payload: Dict[str, Any] = Body(...)):
+        user = getattr(request.state, "user", None)
+        if not user:
+            return Response(status_code=401)
+        apid = str(payload.get("id", "")).strip()
+        if not apid:
+            return Response(status_code=400)
+        valid = False
+        try:
+            if state.profile_validator:
+                valid = bool(state.profile_validator(request, user, apid))
+            elif state.profile_provider:
+                profs = state.profile_provider(request, user) or []
+                valid = any(str(p.get("id")) == str(apid) for p in profs)
+        except Exception:
+            valid = False
+        if not valid:
+            return Response(status_code=403)
+        try:
+            setattr(request.state, "active_profile_id", apid)
+        except Exception:
+            pass
+        resp = Response(status_code=204)
+        try:
+            resp.set_cookie(state.active_profile_cookie, apid, path="/", samesite="lax")
+        except Exception:
+            pass
+        return resp
+
+    @r.get("/ui/active-profile")
+    def _active_profile_get(request: Request):
+        apid = getattr(request.state, "active_profile_id", None)
+        if not apid:
+            return Response(status_code=204)
+        name: Optional[str] = None
+        try:
+            if state.profile_provider and getattr(request.state, "user", None) is not None:
+                profs = state.profile_provider(request, getattr(request.state, "user", None)) or []
+                for p in profs:
+                    if str(p.get("id")) == str(apid):
+                        name = p.get("display_name")
+                        break
+        except Exception:
+            pass
+        return JSONResponse({"id": apid, "name": name})
+
+    @r.post("/ui/active-profile")
+    def _active_profile_set(request: Request, payload: Dict[str, Any] = Body(...)):
+        user = getattr(request.state, "user", None)
+        if not user:
+            return Response(status_code=401)
+        apid = str(payload.get("id", "")).strip()
+        if not apid:
+            return Response(status_code=400)
+        valid = False
+        try:
+            if state.profile_validator:
+                valid = bool(state.profile_validator(request, user, apid))
+            elif state.profile_provider:
+                profs = state.profile_provider(request, user) or []
+                valid = any(str(p.get("id")) == str(apid) for p in profs)
+        except Exception:
+            valid = False
+        if not valid:
+            return Response(status_code=403)
+        try:
+            setattr(request.state, "active_profile_id", apid)
+        except Exception:
+            pass
+        resp = Response(status_code=204)
+        try:
+            resp.set_cookie(state.active_profile_cookie, apid, path="/", samesite="lax")
+        except Exception:
+            pass
+        return resp
 
     @r.get("/ui/context-menu", response_class=HTMLResponse)
     def _context_menu(request: Request, name: str, path: Optional[str] = None, element_id: Optional[str] = None):

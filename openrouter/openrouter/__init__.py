@@ -20,6 +20,13 @@ from .models import (
     resolve_model_id,
 )
 
+from .models_sqlite import (
+    create_table_sql,
+    ensure_sqlite_schema,
+    sqlite_upserter,
+    seed_sqlite,
+)
+
 __all__ = [
     "complete",
     "astream",
@@ -38,4 +45,9 @@ __all__ = [
     "export_catalog",
     "ensure_models",
     "resolve_model_id",
+    # sqlite helpers
+    "create_table_sql",
+    "ensure_sqlite_schema",
+    "sqlite_upserter",
+    "seed_sqlite",
 ]

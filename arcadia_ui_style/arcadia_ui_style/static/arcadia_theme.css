@@ -65,9 +65,9 @@
 
 .t-header{background:var(--header-bg, var(--bg));color:var(--header-fg, var(--fg));border-bottom:1px solid var(--header-border, var(--border));}
 
-.t-btn{color:var(--fg);background:transparent;border:1px solid var(--border);border-radius:var(--btn-radius);}
+.t-btn{color:var(--fg);background:transparent;border:1px solid var(--border);border-radius:var(--btn-radius);cursor:pointer;}
 
-.t-btn-primary{background:var(--primary);border:1px solid var(--primary);color:var(--btn-fg, #fff);border-radius:var(--btn-radius);}
+.t-btn-primary{background:var(--primary);border:1px solid var(--primary);color:var(--btn-fg, #fff);border-radius:var(--btn-radius);cursor:pointer;}
 
 
 /* Theme transition */

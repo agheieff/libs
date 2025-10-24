@@ -90,7 +90,12 @@
       open((dlg,close)=>{
         const body=document.createElement('div'); body.style.padding='16px'; body.textContent=String(msg||''); dlg.appendChild(body);
         const actions=document.createElement('div'); actions.style.display='flex'; actions.style.justifyContent='flex-end'; actions.style.gap='8px'; actions.style.padding='0 16px 16px'; dlg.appendChild(actions);
-        const ok=document.createElement('button'); ok.textContent=(opts&&opts.okLabel)||'OK'; ok.addEventListener('click', ()=>{ close(); resolve(true); }); actions.appendChild(ok);
+        const ok=document.createElement('button');
+        ok.type='button';
+        ok.className='t-btn t-btn-primary';
+        ok.textContent=(opts&&opts.okLabel)||'OK';
+        ok.addEventListener('click', ()=>{ close(); resolve(true); });
+        actions.appendChild(ok);
       });
     });
   }
@@ -100,8 +105,18 @@
       open((dlg,close)=>{
         const body=document.createElement('div'); body.style.padding='16px'; body.textContent=String(msg||''); dlg.appendChild(body);
         const actions=document.createElement('div'); actions.style.display='flex'; actions.style.justifyContent='flex-end'; actions.style.gap='8px'; actions.style.padding='0 16px 16px'; dlg.appendChild(actions);
-        const cancel=document.createElement('button'); cancel.textContent=(opts&&opts.cancelLabel)||'Cancel'; cancel.addEventListener('click', ()=>{ close(); resolve(false); }); actions.appendChild(cancel);
-        const ok=document.createElement('button'); ok.textContent=(opts&&opts.okLabel)||'OK'; ok.addEventListener('click', ()=>{ close(); resolve(true); }); actions.appendChild(ok);
+        const cancel=document.createElement('button');
+        cancel.type='button';
+        cancel.className='t-btn';
+        cancel.textContent=(opts&&opts.cancelLabel)||'Cancel';
+        cancel.addEventListener('click', ()=>{ close(); resolve(false); });
+        actions.appendChild(cancel);
+        const ok=document.createElement('button');
+        ok.type='button';
+        ok.className='t-btn t-btn-primary';
+        ok.textContent=(opts&&opts.okLabel)||'OK';
+        ok.addEventListener('click', ()=>{ close(); resolve(true); });
+        actions.appendChild(ok);
       });
     });
   }
@@ -114,8 +129,18 @@
         const input=document.createElement('input'); input.type='text'; input.value=(opts&&opts.defaultValue)||''; input.style.width='100%'; input.style.padding='8px'; input.style.border='1px solid var(--border)'; input.style.borderRadius='6px'; input.style.background='var(--panel)'; input.style.color='var(--fg)'; body.appendChild(input);
         input.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); ok.click(); } });
         const actions=document.createElement('div'); actions.style.display='flex'; actions.style.justifyContent='flex-end'; actions.style.gap='8px'; actions.style.padding='0 16px 16px'; dlg.appendChild(actions);
-        const cancel=document.createElement('button'); cancel.textContent=(opts&&opts.cancelLabel)||'Cancel'; cancel.addEventListener('click', ()=>{ close(); resolve(null); }); actions.appendChild(cancel);
-        const ok=document.createElement('button'); ok.textContent=(opts&&opts.okLabel)||'OK'; ok.addEventListener('click', ()=>{ close(); resolve(String(input.value)); }); actions.appendChild(ok);
+        const cancel=document.createElement('button');
+        cancel.type='button';
+        cancel.className='t-btn';
+        cancel.textContent=(opts&&opts.cancelLabel)||'Cancel';
+        cancel.addEventListener('click', ()=>{ close(); resolve(null); });
+        actions.appendChild(cancel);
+        const ok=document.createElement('button');
+        ok.type='button';
+        ok.className='t-btn t-btn-primary';
+        ok.textContent=(opts&&opts.okLabel)||'OK';
+        ok.addEventListener('click', ()=>{ close(); resolve(String(input.value)); });
+        actions.appendChild(ok);
         setTimeout(()=>{ try{ input.focus(); input.select(); }catch{} }, 0);
       });
     });

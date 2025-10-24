@@ -10,6 +10,7 @@ from .router import (
     UIState,
 )
 from .theme import ThemeManager, Theme
+from .router import ActiveProfileMiddleware
 from .contextmenu import ContextMenuRegistry, ContextMenuRequest, MenuItem
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "UIState",
     "ThemeManager",
     "Theme",
+    "ActiveProfileMiddleware",
     "ContextMenuRegistry",
     "ContextMenuRequest",
     "MenuItem",

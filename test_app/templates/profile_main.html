@@ -40,13 +40,12 @@
 
     function updateDeleteButtons(){
       try{
-        const rows = tbody ? tbody.querySelectorAll('tr') : [];
-        const shouldDisable = (!MULTI) || (rows.length <= 1);
+        const rows = Array.from(tbody ? tbody.querySelectorAll('tr') : []);
+        const realCount = rows.filter(r => (r.dataset.id && r.dataset.id !== 'new')).length;
+        const hide = (!MULTI) || (realCount <= 1);
         (tbody ? tbody.querySelectorAll('.del-btn') : []).forEach(function(btn){
-          try{
-            btn.disabled = !!shouldDisable;
-            btn.title = shouldDisable ? 'Cannot delete last profile' : 'Delete';
-          }catch{}
+          const td = btn && btn.closest ? btn.closest('td') : null;
+          if (td) td.style.display = hide ? 'none' : '';
         });
       }catch{}
     }

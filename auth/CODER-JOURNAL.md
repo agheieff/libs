@@ -27,3 +27,9 @@ Commit: f7e4422
 Change: E) Make password hashing configurable; prefer argon2id by default with PBKDF2 fallback.
 Files: auth/arcadia_auth/security.py, auth/arcadia_auth/__init__.py
 Commit: b484e0f
+
+2025-10-24
+
+Change: F) Add AuthSettings.unique_profile_names (default False).
+Files: auth/arcadia_auth/router.py
+Commit: 9cdfb94

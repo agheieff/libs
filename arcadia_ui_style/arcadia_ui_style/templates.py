@@ -99,7 +99,7 @@ def ensure_templates(app_dir: str) -> str:
           <button class=\"tm-user-btn\" id=\"tm-user-btn\">Account ▾</button>
           <div class=\"tm-user-menu\" id=\"tm-user-menu\">
             <button class=\"tm-menu-trigger\" id=\"theme-menu-trigger\">Theme</button>
-            <div id=\"theme-submenu\" style=\"display:none; position:absolute; right: 100%; top: 0; padding:6px; z-index: 3000;\"></div>
+            <div id=\"theme-submenu\" style=\"display:none; position:absolute; right: 100%; top: 0; z-index: 3000;\"></div>
             <a href=\"/profile\">Profile</a>
             <a href=\"/settings\">Settings</a>
             <hr />
@@ -116,6 +116,7 @@ def ensure_templates(app_dir: str) -> str:
   </div>
 </header>
 <!-- Dropdown uses CSS :focus-within; no JS needed -->
+<script src="/ui-static/theme-selector.js"></script>
 {% set __persist = persist_header if persist_header is defined else true %}
 {% if __persist %}
 <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-+bVsx3b8QdE7cO1S4oFQ9hQ1TImfQxWqS4LzJd8j3jL5uFQw8L7f3NfL2hJdJg9w" crossorigin="anonymous"></script>

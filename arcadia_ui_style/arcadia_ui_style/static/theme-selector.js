@@ -71,9 +71,9 @@
       const displayName = DISPLAY_NAMES[themeName] || themeName;
       
       const button = document.createElement('button');
-      button.className = 'theme-item';
+      button.className = 'theme-item theme-' + themeName;
       button.setAttribute('data-theme', themeName);
-      button.style.cssText = 'width:100%;padding:8px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;';
+      button.style.cssText = 'width:100%;padding:0.5rem 0.75rem;border:none;background:var(--panel);text-align:left;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;color:var(--fg);';
       
       // Add margin for items after the first
       if (index > 0) {
@@ -85,26 +85,7 @@
       label.textContent = displayName;
       button.appendChild(label);
       
-      // Theme swatches (3 colors: bg, panel, primary)
-      const swatches = document.createElement('span');
-      swatches.className = 'theme-swatches';
-      swatches.style.cssText = 'display:flex;gap:3px;margin-left:auto;';
-      
-      // Create 3 swatches
-      const colors = [
-        theme['--bg'] || '#ffffff',
-        theme['--panel'] || '#f9f9fb', 
-        theme['--primary'] || '#1f6feb'
-      ];
-      
-      colors.forEach(color => {
-        const swatch = document.createElement('span');
-        swatch.className = 'theme-swatch';
-        swatch.style.cssText = `width:12px;height:12px;border-radius:50%;background:${color};border:1px solid var(--border);`;
-        swatches.appendChild(swatch);
-      });
-      
-      button.appendChild(swatches);
+      // No color swatches; keep item minimal with label only
       submenu.appendChild(button);
       
       // Add click handler
@@ -153,36 +134,17 @@
       const displayName = DISPLAY_NAMES[themeName] || themeName;
       
       const button = document.createElement('button');
-      button.className = 'theme-item';
+      button.className = 'theme-item theme-' + themeName;
       button.setAttribute('data-theme', themeName);
-      
-      // Copy main dropdown styling exactly
-      button.style.cssText = 'display:block;padding:0.5rem 0.75rem;color:var(--fg);text-decoration:none;font-size:14px;background:none;border:none;width:100%;text-align:left;cursor:pointer;';
+      // Match dropdown feel while previewing the theme variables on the item
+      button.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0.5rem 0.75rem;color:var(--fg);text-decoration:none;font-size:14px;background:var(--panel);border:none;width:100%;text-align:left;cursor:pointer;';
       
       // Theme label
       const label = document.createElement('span');
       label.textContent = displayName;
       button.appendChild(label);
       
-      // Theme swatches (3 colors) - add after label
-      const swatches = document.createElement('span');
-      swatches.className = 'theme-swatches';
-      swatches.style.cssText = 'display:flex;gap:4px;margin-left:8px;';
-      
-      const colors = [
-        theme['--bg'] || '#ffffff',
-        theme['--panel'] || '#f9f9fb', 
-        theme['--primary'] || '#1f6feb'
-      ];
-      
-      colors.forEach(color => {
-        const swatch = document.createElement('span');
-        swatch.className = 'theme-swatch';
-        swatch.style.cssText = `width:12px;height:12px;border-radius:50%;background:${color};border:1px solid var(--border);`;
-        swatches.appendChild(swatch);
-      });
-      
-      button.appendChild(swatches);
+      // No color swatches; minimal label-only item
       submenu.appendChild(button);
       
       // Add click handler

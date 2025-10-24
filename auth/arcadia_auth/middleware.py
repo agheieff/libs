@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.types import ASGIApp
 
-from .security import decode_token
+from .auth_utils import extract_subject
 
 
 class CookieUserMiddleware(BaseHTTPMiddleware):
@@ -41,8 +41,7 @@ class CookieUserMiddleware(BaseHTTPMiddleware):
             request.state.user = None
             token = request.cookies.get(self._cookie)
             if token:
-                data = decode_token(token, self._secret, [self._alg])
-                sub = data.get("sub") if data else None
+                sub = extract_subject(token, self._secret, [self._alg])
                 if sub is not None:
                     s = self._sf()
                     try:
@@ -88,8 +87,7 @@ class TokenCookieMiddleware(BaseHTTPMiddleware):
             request.state.agent = None
             token = request.cookies.get(self._cookie)
             if token:
-                data = decode_token(token, self._secret, [self._alg])
-                sub = data.get("sub") if data else None
+                sub = extract_subject(token, self._secret, [self._alg])
                 if sub is not None:
                     # Minimal identity object
                     ident = {"id": sub}

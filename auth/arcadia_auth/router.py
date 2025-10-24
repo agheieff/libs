@@ -7,7 +7,8 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 
 from .schemas import AccountCreate, AccountOut, LoginIn, TokenOut, ProfileCreate, ProfileOut
-from .security import hash_password, verify_password, create_access_token, decode_token
+from .security import hash_password, verify_password, create_access_token
+from .auth_utils import parse_bearer_token, extract_subject
 from .repo import AuthRepository
 from .policy import validate_password
 
@@ -28,12 +29,7 @@ class AuthSettings:
 
 
 def _auth_header(authorization: Optional[str] = Header(default=None, alias="Authorization")) -> Optional[str]:
-    if not authorization:
-        return None
-    val = authorization.strip()
-    if not val.lower().startswith("bearer "):
-        return None
-    return val.split(" ", 1)[1]
+    return parse_bearer_token(authorization)
 
 
 def create_auth_router(
@@ -105,10 +101,10 @@ def create_auth_router(
     def me(authorization: Optional[str] = Depends(_auth_header)):
         if not authorization:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
-        if not data or "sub" not in data:
+        sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
+        if sub is None:
             raise HTTPException(status_code=401, detail="Invalid token")
-        acc = repo.get_account_by_id(data["sub"])  # type: ignore[arg-type]
+        acc = repo.get_account_by_id(sub)  # type: ignore[arg-type]
         if not acc:
             raise HTTPException(status_code=401, detail="User not found")
         return _to_account_out(acc)
@@ -120,11 +116,10 @@ def create_auth_router(
     def list_my_profiles(authorization: Optional[str] = Depends(_auth_header)):
         if not authorization:
             raise HTTPException(401, "Not authenticated")
-        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
-        if not data or "sub" not in data:
+        sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
+        if sub is None:
             raise HTTPException(401, "Invalid token")
-        acc_id = data["sub"]
-        profs = repo.list_profiles(acc_id)  # type: ignore[arg-type]
+        profs = repo.list_profiles(sub)  # type: ignore[arg-type]
         return [_to_profile_out(p) for p in profs]
 
     @pr.post("/", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
@@ -133,20 +128,20 @@ def create_auth_router(
             raise HTTPException(400, "Multiple profiles disabled")
         if not authorization:
             raise HTTPException(401, "Not authenticated")
-        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
-        if not data or "sub" not in data:
+        sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
+        if sub is None:
             raise HTTPException(401, "Invalid token")
-        p = repo.create_profile(data["sub"], display_name=payload.display_name, prefs=payload.prefs, extras=payload.extras)  # type: ignore[arg-type]
+        p = repo.create_profile(sub, display_name=payload.display_name, prefs=payload.prefs, extras=payload.extras)  # type: ignore[arg-type]
         return _to_profile_out(p)
 
     @pr.delete("/{profile_id}")
     def delete_my_profile(profile_id: str, authorization: Optional[str] = Depends(_auth_header)):
         if not authorization:
             raise HTTPException(401, "Not authenticated")
-        data = decode_token(authorization, settings.secret_key, [settings.algorithm])
-        if not data or "sub" not in data:
+        sub = extract_subject(authorization, settings.secret_key, [settings.algorithm])
+        if sub is None:
             raise HTTPException(401, "Invalid token")
-        repo.delete_profile(data["sub"], profile_id)  # type: ignore[arg-type]
+        repo.delete_profile(sub, profile_id)  # type: ignore[arg-type]
         return {"ok": True}
 
     r.include_router(pr)

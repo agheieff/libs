@@ -1,0 +1,62 @@
+<main style="max-width:960px;margin:24px auto;padding:0 16px;">
+  <h1 class="t-fg" style="margin:0 0 12px;">Keyboard Shortcuts</h1>
+  <p class="t-muted" style="margin-top:0;">List of shortcuts registered at runtime. This page is not linked by default.</p>
+
+  <div class="t-panel" style="margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:6px;">
+    <div id="shortcuts-status" class="t-muted" style="margin-bottom:8px;">Loading…</div>
+    <div id="shortcuts-list"></div>
+  </div>
+
+  <script src="/ui-static/shortcuts.js"></script>
+  <script>
+  (function(){
+    function render(list){
+      const status = document.getElementById('shortcuts-status');
+      const mount = document.getElementById('shortcuts-list');
+      if (!Array.isArray(list) || !list.length){
+        status.textContent = 'No shortcuts registered.';
+        mount.innerHTML = '';
+        return;
+      }
+      status.textContent = '';
+      // Sort by title then by shortcut
+      list.sort(function(a,b){
+        const at = (a.title||a.id||'').toLowerCase();
+        const bt = (b.title||b.id||'').toLowerCase();
+        if (at < bt) return -1; if (at > bt) return 1;
+        const ak = (a.shortcut||''); const bk = (b.shortcut||'');
+        return ak.localeCompare(bk);
+      });
+      const tbl = document.createElement('table');
+      tbl.style.width = '100%';
+      tbl.style.borderCollapse = 'collapse';
+      const head = document.createElement('thead');
+      head.innerHTML = '<tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);">Action</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);">Shortcut</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);">Scope</th></tr>';
+      tbl.appendChild(head);
+      const body = document.createElement('tbody');
+      list.forEach(function(it){
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.style.padding = '6px 8px'; td1.textContent = it.title || it.id || '';
+        const td2 = document.createElement('td'); td2.style.padding = '6px 8px'; td2.textContent = it.shortcut || '';
+        const td3 = document.createElement('td'); td3.style.padding = '6px 8px'; td3.textContent = it.scope || '';
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+        body.appendChild(tr);
+      });
+      tbl.appendChild(body);
+      mount.innerHTML = ''; mount.appendChild(tbl);
+    }
+
+    function load(){
+      try{
+        const api = window.ArcadiaShortcuts;
+        if (!api || !api.getActions){ render([]); return; }
+        const actions = api.getActions();
+        render(actions);
+      }catch(e){ render([]); }
+    }
+    // Initial and after dynamic registrations
+    load();
+    window.addEventListener('ui:shortcuts:updated', load);
+  })();
+  </script>
+</main>

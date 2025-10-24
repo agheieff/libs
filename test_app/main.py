@@ -67,6 +67,10 @@ def settings(request: Request):
 def account(request: Request):
     return render_page(request, templates, content_template="account_main.html", title="Account", context={})
 
+@app.get("/shortcuts", response_class=HTMLResponse)
+def shortcuts(request: Request):
+    return render_page(request, templates, content_template="shortcuts_main.html", title="Keyboard Shortcuts", context={})
+
 
 if __name__ == "__main__":
     import uvicorn

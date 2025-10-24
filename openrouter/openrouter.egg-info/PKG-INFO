@@ -20,7 +20,7 @@ It expects the following env vars at call-time:
 Install locally (editable) from the project using:
 
 ```
-pip install -e file:../libs/openrouter
+uv add -e ../libs/openrouter
 ```
 
 Note: This package is intended for local development and is not published.

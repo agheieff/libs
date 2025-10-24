@@ -134,6 +134,7 @@ class ThemeManager:
   text-align: left;
   padding: 8px 12px;
   font-size: 14px;
+  font-family: inherit;
   color: var(--fg);
   cursor: pointer;
 }

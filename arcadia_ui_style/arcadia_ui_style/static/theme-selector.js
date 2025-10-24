@@ -73,7 +73,7 @@
       const button = document.createElement('button');
       button.className = 'theme-item theme-' + themeName;
       button.setAttribute('data-theme', themeName);
-      button.style.cssText = 'width:100%;padding:0.5rem 0.75rem;border:none;background:var(--panel);text-align:left;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;color:var(--fg);';
+      button.style.cssText = 'width:100%;padding:0.5rem 0.75rem;border:none;background:var(--panel);text-align:left;cursor:pointer;font-size:14px;font-family:inherit;display:flex;align-items:center;gap:8px;color:var(--fg);';
       
       // Add margin for items after the first
       if (index > 0) {
@@ -137,7 +137,7 @@
       button.className = 'theme-item theme-' + themeName;
       button.setAttribute('data-theme', themeName);
       // Match dropdown feel while previewing the theme variables on the item
-      button.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0.5rem 0.75rem;color:var(--fg);text-decoration:none;font-size:14px;background:var(--panel);border:none;width:100%;text-align:left;cursor:pointer;';
+      button.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0.5rem 0.75rem;color:var(--fg);text-decoration:none;font-size:14px;font-family:inherit;background:var(--panel);border:none;width:100%;text-align:left;cursor:pointer;';
       
       // Theme label
       const label = document.createElement('span');

@@ -278,3 +278,9 @@ def ensure_templates(app_dir: str) -> str:
             encoding="utf-8",
         )
     return str(tdir)
+
+# Backward-compat wrapper: delegate to refactored helpers (step B)
+from .templates_v2 import ensure_templates as _ensure_templates_v2  # type: ignore
+
+def ensure_templates(app_dir: str) -> str:  # type: ignore[no-redef]
+    return _ensure_templates_v2(app_dir)

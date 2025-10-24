@@ -3,11 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Tuple
 
-try:  # Preserve current gating behavior; decouple in step C
-    from arcadia_ui_core import ThemeManager  # type: ignore
-except Exception:
-    ThemeManager = None  # type: ignore
-
 
 _HEADER_SENTINEL = "<!-- arcadia-ui-style:v1 -->"
 
@@ -130,7 +125,7 @@ def _ensure_theme_assets(sdir: Path) -> None:
     else:
         regen_theme = True
 
-    if ThemeManager is not None and regen_theme:
+    if regen_theme:
         from .theme import ThemeManager as NewThemeManager
         tm = NewThemeManager()
         theme_css.write_text(tm.generate_css(default="light"), encoding="utf-8")

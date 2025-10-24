@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, Type, Dict, Any
 from dataclasses import dataclass
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status, Request, Cookie
 
 from .schemas import AccountCreate, AccountOut, LoginIn, TokenOut, ProfileCreate, ProfileOut
 from .security import hash_password, verify_password, create_access_token
@@ -29,8 +29,24 @@ class AuthSettings:
     require_special: bool = False  # non-alnum
 
 
-def _auth_header(authorization: Optional[str] = Header(default=None, alias="Authorization")) -> Optional[str]:
-    return parse_bearer_token(authorization)
+def _auth_header(
+    request: Request,
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    access_token: Optional[str] = Cookie(default=None),
+) -> Optional[str]:
+    # Prefer Bearer token from Authorization; fallback to access_token cookie
+    token = parse_bearer_token(authorization)
+    if token:
+        return token
+    if access_token:
+        return access_token
+    try:
+        ck = request.cookies.get("access_token")
+        if ck:
+            return ck
+    except Exception:
+        pass
+    return None
 
 
 def create_auth_router(

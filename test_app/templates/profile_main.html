@@ -38,6 +38,19 @@
 
     function rowDividerStyle(i){ return i===0 ? '' : 'border-top:1px solid var(--border);'; }
 
+    function updateDeleteButtons(){
+      try{
+        const rows = tbody ? tbody.querySelectorAll('tr') : [];
+        const shouldDisable = (!MULTI) || (rows.length <= 1);
+        (tbody ? tbody.querySelectorAll('.del-btn') : []).forEach(function(btn){
+          try{
+            btn.disabled = !!shouldDisable;
+            btn.title = shouldDisable ? 'Cannot delete last profile' : 'Delete';
+          }catch{}
+        });
+      }catch{}
+    }
+
     function renderRows(list){
       tbody.innerHTML = '';
       if (!Array.isArray(list) || !list.length){
@@ -46,6 +59,7 @@
       }
       statusEl.textContent = '';
       list.forEach((p, i)=> tbody.appendChild(renderRow(p, 'view', i)));
+      updateDeleteButtons();
     }
 
     function renderRow(p, state, index){
@@ -134,6 +148,7 @@
             tr.dataset.id = String(created.id);
             nameView.textContent = created.display_name || ('#'+created.id);
             setState('view');
+            updateDeleteButtons();
             window.dispatchEvent(new CustomEvent('profile:created',{detail:{profile:created}}));
           }catch(e){ toast('error','Network error'); }
         } else {
@@ -152,7 +167,19 @@
 
       btnEdit.addEventListener('click', function(){ setState('edit'); setTimeout(()=>{ try{ input.focus(); input.select(); }catch{} }, 0); });
       btnSave.addEventListener('click', save);
-      input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); save(); } if(e.key==='Escape'){ e.preventDefault(); if (tr.dataset.id==='new'){ tr.remove(); checkEmpty(); } else { setState('view'); } } });
+      input.addEventListener('keydown', function(e){
+        if(e.key==='Enter'){ e.preventDefault(); save(); }
+        if(e.key==='Escape'){
+          e.preventDefault();
+          if (tr.dataset.id==='new'){
+            tr.remove();
+            checkEmpty();
+            updateDeleteButtons();
+          } else {
+            setState('view');
+          }
+        }
+      });
 
       btnDel.addEventListener('click', async function(){
         let ok = false;
@@ -160,9 +187,19 @@
         if (!ok) return;
         try{
           const res = await fetch('/auth/profiles/'+encodeURIComponent(tr.dataset.id), { method:'DELETE' });
-          if(!res.ok){ toast('error','Delete failed'); return; }
+          if(!res.ok){
+            try{
+              const t = await res.text();
+              let d = {};
+              try{ d = JSON.parse(t||''); }catch{}
+              const m = (d && d.detail) || 'Delete failed';
+              toast('error', m);
+            }catch{ toast('error','Delete failed'); }
+            return;
+          }
           tr.remove();
           checkEmpty();
+          updateDeleteButtons();
           window.dispatchEvent(new CustomEvent('profile:deleted',{detail:{profile:p}}));
         }catch(e){ toast('error','Network error'); }
       });
@@ -178,7 +215,7 @@
         const res = await fetch('/auth/profiles/');
         if(!res.ok){ statusEl.textContent = 'Not authenticated.'; tbody.innerHTML=''; return; }
         const data = await res.json();
-        if (MULTI){ renderRows(data); } else { statusEl.textContent=''; tbody.innerHTML=''; if (data[0]) tbody.appendChild(renderRow(data[0],'view',0)); }
+        if (MULTI){ renderRows(data); } else { statusEl.textContent=''; tbody.innerHTML=''; if (data[0]) tbody.appendChild(renderRow(data[0],'view',0)); updateDeleteButtons(); }
       }catch(e){ statusEl.textContent = 'Error loading.'; tbody.innerHTML=''; }
     }
 
@@ -189,6 +226,7 @@
         const tr = renderRow(p, 'edit', tbody.children.length);
         tr.dataset.id = 'new';
         tbody.prepend(tr);
+        updateDeleteButtons();
         const input = tr.querySelector('.name-edit input');
         setTimeout(()=>{ try{ input && input.focus(); }catch{} }, 0);
       });

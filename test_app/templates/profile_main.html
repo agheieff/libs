@@ -55,27 +55,35 @@
       const tdName = document.createElement('td');
       tdName.style.cssText = 'padding:8px 0;'+rowDividerStyle(index);
       const nameWrap = document.createElement('div');
-      nameWrap.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;';
+      // Grid: 32ch for name, 1fr spacer, min-content for buttons
+      nameWrap.style.cssText = 'display:grid;align-items:center;gap:8px;grid-template-columns:32ch 1fr min-content;';
       const nameView = document.createElement('div');
       nameView.className = 'name-view';
       nameView.textContent = p.display_name || ('#'+p.id);
+      nameView.style.gridColumn = '1';
       const nameEdit = document.createElement('div');
       nameEdit.className = 'name-edit';
       nameEdit.style.display = 'none';
       const input = document.createElement('input');
       input.type = 'text';
       input.value = p.display_name || '';
-      input.style.cssText = 'flex:1; padding:6px; border:1px solid var(--border); border-radius:4px; background:var(--panel); color:var(--fg); min-width:160px;';
+      // Enforce 32-char limit and fit within 32ch column
+      try { input.maxLength = 32; } catch {}
+      try { input.setAttribute('maxlength','32'); } catch {}
+      input.style.cssText = 'width:100%; padding:6px; border:1px solid var(--border); border-radius:4px; background:var(--panel); color:var(--fg);';
       nameEdit.appendChild(input);
+      nameEdit.style.gridColumn = '1';
       const btnEdit = document.createElement('button');
       btnEdit.className = 't-btn edit-btn';
       btnEdit.title = 'Edit';
       btnEdit.textContent = '✎';
+      btnEdit.style.gridColumn = '3';
       const btnSave = document.createElement('button');
       btnSave.className = 't-btn save-btn';
       btnSave.title = 'Save';
       btnSave.textContent = '✓';
       btnSave.style.display = 'none';
+      btnSave.style.gridColumn = '3';
       nameWrap.appendChild(nameView);
       nameWrap.appendChild(nameEdit);
       nameWrap.appendChild(btnEdit);
@@ -84,14 +92,16 @@
 
       // extra columns container for future/app columns
       const tdExtra = document.createElement('td');
-      tdExtra.style.cssText = 'padding:8px 0;'+rowDividerStyle(index);
+      // Make this middle column consume available table width
+      tdExtra.style.cssText = 'padding:8px 0; width:99%;'+rowDividerStyle(index);
       tdExtra.className = 'extra-cols';
 
       const tdDel = document.createElement('td');
       tdDel.style.cssText = 'padding:8px 0; text-align:right;'+rowDividerStyle(index);
       const btnDel = document.createElement('button');
       btnDel.className = 't-btn del-btn';
-      btnDel.textContent = 'Delete';
+      btnDel.title = 'Delete';
+      btnDel.textContent = '🗑️';
       tdDel.appendChild(btnDel);
 
       tr.appendChild(tdName);

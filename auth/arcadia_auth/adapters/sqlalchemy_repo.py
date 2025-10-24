@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Callable, Optional, Dict, Type
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from ..repo import AuthRepository
 
@@ -77,7 +78,12 @@ class SQLAlchemyRepo(AuthRepository):
     def find_account_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         s = self._sf()
         try:
-            u = s.query(self.U).filter(getattr(self.U, self.uf_email) == email).first()
+            key = email.strip().lower()
+            u = (
+                s.query(self.U)
+                .filter(func.lower(getattr(self.U, self.uf_email)) == key)
+                .first()
+            )
             return (self._acc_to_dict(u) if u else None)
         finally:
             s.close()
@@ -85,7 +91,12 @@ class SQLAlchemyRepo(AuthRepository):
     def get_account_credentials(self, email: str) -> Optional[Dict[str, Any]]:
         s = self._sf()
         try:
-            u = s.query(self.U).filter(getattr(self.U, self.uf_email) == email).first()
+            key = email.strip().lower()
+            u = (
+                s.query(self.U)
+                .filter(func.lower(getattr(self.U, self.uf_email)) == key)
+                .first()
+            )
             return (self._acc_to_credentials(u) if u else None)
         finally:
             s.close()
@@ -94,7 +105,7 @@ class SQLAlchemyRepo(AuthRepository):
         s = self._sf()
         try:
             u = self.U()
-            setattr(u, self.uf_email, email)
+            setattr(u, self.uf_email, email.strip().lower())
             setattr(u, self.uf_pwd, password_hash)
             if hasattr(u, self.uf_active):
                 setattr(u, self.uf_active, True)

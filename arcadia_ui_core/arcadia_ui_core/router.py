@@ -25,6 +25,8 @@ class UIState:
     templates: Jinja2Templates
     user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None
     context_menus: Optional[ContextMenuRegistry] = None
+    translations: Optional[Dict[str, Dict[str, str]]] = None
+    locale: Optional[str] = "en"
 
 
 def mount_templates(
@@ -41,6 +43,8 @@ def mount_templates(
     user_menu_items: Optional[List[Dict[str, Any]]] = None,
     user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None,
     context_menus: Optional[ContextMenuRegistry] = None,
+    translations: Optional[Dict[str, Dict[str, str]]] = None,
+    locale: Optional[str] = "en",
 ):
     """Configure provided Jinja templates with globals.
 
@@ -67,7 +71,30 @@ def mount_templates(
     if user_menu_items is not None:
         gi["user_menu_items"] = user_menu_items
 
-    return UIState(templates=templates, user_menu_provider=user_menu_provider, context_menus=context_menus)
+    state = UIState(
+        templates=templates,
+        user_menu_provider=user_menu_provider,
+        context_menus=context_menus,
+        translations=translations,
+        locale=locale,
+    )
+
+    # Inject minimal i18n lookup as a Jinja global
+    def t(key: str, default: Optional[str] = None) -> str:
+        try:
+            loc = state.locale or "en"
+            table = (state.translations or {}).get(loc)
+            if isinstance(table, dict):
+                val = table.get(key)
+                if val is not None:
+                    return str(val)
+        except Exception:
+            pass
+        return default if default is not None else key
+
+    templates.env.globals["t"] = t
+
+    return state
 
 
 def attach_ui(
@@ -85,6 +112,8 @@ def attach_ui(
     user_menu_items: Optional[List[Dict[str, Any]]] = None,
     user_menu_provider: Optional[Callable[[Any], List[Dict[str, Any]]]] = None,
     context_menus: Optional[ContextMenuRegistry] = None,
+    translations: Optional[Dict[str, Dict[str, str]]] = None,
+    locale: Optional[str] = "en",
 ) -> UIState:
     """Attach UI state to app.state.ui and configure template globals.
 
@@ -103,6 +132,8 @@ def attach_ui(
         user_menu_items=user_menu_items,
         user_menu_provider=user_menu_provider,
         context_menus=context_menus,
+        translations=translations,
+        locale=locale,
     )
     # Attach to app.state for request-time access
     setattr(app.state, "ui", state)

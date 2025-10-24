@@ -7,54 +7,184 @@
   {% endif %}
 
   <div class="t-panel" style="margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:6px;">
-    <h2 style="margin:0 0 12px;font-size:18px;">{{ 'Profiles' if multi_profile else 'Profile Info' }}</h2>
-    <div id="profile-content" class="t-fg" style="font-size:14px;">
-      Loading…
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <h2 style="margin:0;font-size:18px;">{{ 'Profiles' if multi_profile else 'Profile Info' }}</h2>
+      {% if multi_profile %}
+        <button id="btn-new" class="t-btn" style="padding:6px 10px;">New profile</button>
+      {% endif %}
     </div>
-    {% if multi_profile %}
-    <form id="add-profile" style="margin-top:12px;display:flex;gap:8px;align-items:center;">
-      <input id="display_name" placeholder="New profile name" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:4px; background:var(--panel); color:var(--fg);"/>
-      <button class="t-btn" type="submit" style="padding:6px 10px;">Add</button>
-    </form>
-    <div id="prof-msg" class="t-muted" style="margin-top:8px;"></div>
-    {% endif %}
+    <div id="profiles-status" class="t-muted" style="margin-top:8px;">Loading…</div>
+    <table id="profiles-table" style="width:100%;border-collapse:collapse;margin-top:8px;">
+      <tbody id="profiles-body"></tbody>
+    </table>
   </div>
 
+  <script src="/ui-static/modal.js"></script>
+  <script src="/ui-static/toast.js"></script>
   <script>
   (function(){
     const MULTI = {{ 'true' if multi_profile else 'false' }};
-    const content = document.getElementById('profile-content');
-    const msg = document.getElementById('prof-msg');
-    function setMsg(t, ok){ if(!msg) return; msg.textContent=t||''; msg.style.color = ok? 'var(--fg)':'#b91c1c'; }
-    function renderList(list){
-      if(!Array.isArray(list)) { content.textContent = 'Error.'; return; }
-      if(!list.length){ content.textContent = 'No profiles yet.'; return; }
-      const ul = document.createElement('ul'); ul.style.listStyle='none'; ul.style.padding='0'; ul.style.margin='0';
-      list.forEach(p=>{ const li=document.createElement('li'); li.style.padding='6px 0'; li.textContent = p.display_name || ('#'+p.id); ul.appendChild(li); });
-      content.innerHTML=''; content.appendChild(ul);
+    const statusEl = document.getElementById('profiles-status');
+    const tbody = document.getElementById('profiles-body');
+    const newBtn = document.getElementById('btn-new');
+
+    // extensibility hook
+    window.ProfileTable = window.ProfileTable || { columns: [], addColumn(col){ try{ this.columns.push(col); }catch(e){} } };
+
+    function toast(kind, msg){
+      try { if (window.ArcadiaToast) { (window.ArcadiaToast[kind]||window.ArcadiaToast.info)(String(msg||'')); return; } } catch {}
+      console[(kind==='error'?'error':'log')](msg);
     }
+
+    function rowDividerStyle(i){ return i===0 ? '' : 'border-top:1px solid var(--border);'; }
+
+    function renderRows(list){
+      tbody.innerHTML = '';
+      if (!Array.isArray(list) || !list.length){
+        statusEl.textContent = 'No profiles yet.';
+        return;
+      }
+      statusEl.textContent = '';
+      list.forEach((p, i)=> tbody.appendChild(renderRow(p, 'view', i)));
+    }
+
+    function renderRow(p, state, index){
+      const tr = document.createElement('tr');
+      tr.dataset.id = String(p.id||'');
+
+      const tdName = document.createElement('td');
+      tdName.style.cssText = 'padding:8px 0;'+rowDividerStyle(index);
+      const nameWrap = document.createElement('div');
+      nameWrap.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;';
+      const nameView = document.createElement('div');
+      nameView.className = 'name-view';
+      nameView.textContent = p.display_name || ('#'+p.id);
+      const nameEdit = document.createElement('div');
+      nameEdit.className = 'name-edit';
+      nameEdit.style.display = 'none';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = p.display_name || '';
+      input.style.cssText = 'flex:1; padding:6px; border:1px solid var(--border); border-radius:4px; background:var(--panel); color:var(--fg); min-width:160px;';
+      nameEdit.appendChild(input);
+      const btnEdit = document.createElement('button');
+      btnEdit.className = 't-btn edit-btn';
+      btnEdit.title = 'Edit';
+      btnEdit.textContent = '✎';
+      const btnSave = document.createElement('button');
+      btnSave.className = 't-btn save-btn';
+      btnSave.title = 'Save';
+      btnSave.textContent = '✓';
+      btnSave.style.display = 'none';
+      nameWrap.appendChild(nameView);
+      nameWrap.appendChild(nameEdit);
+      nameWrap.appendChild(btnEdit);
+      nameWrap.appendChild(btnSave);
+      tdName.appendChild(nameWrap);
+
+      // extra columns container for future/app columns
+      const tdExtra = document.createElement('td');
+      tdExtra.style.cssText = 'padding:8px 0;'+rowDividerStyle(index);
+      tdExtra.className = 'extra-cols';
+
+      const tdDel = document.createElement('td');
+      tdDel.style.cssText = 'padding:8px 0; text-align:right;'+rowDividerStyle(index);
+      const btnDel = document.createElement('button');
+      btnDel.className = 't-btn del-btn';
+      btnDel.textContent = 'Delete';
+      tdDel.appendChild(btnDel);
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdExtra);
+      tr.appendChild(tdDel);
+
+      function setState(s){
+        state = s;
+        const editing = (s==='edit');
+        nameView.style.display = editing ? 'none' : '';
+        nameEdit.style.display = editing ? '' : 'none';
+        btnEdit.style.display = editing ? 'none' : '';
+        btnSave.style.display = editing ? '' : 'none';
+        // re-render extra columns
+        tdExtra.innerHTML='';
+        try{ (window.ProfileTable.columns||[]).forEach(function(col){
+          try { col.render && col.render(p, tdExtra, s); } catch {}
+        }); }catch{}
+      }
+
+      async function save(){
+        const newName = (input.value||'').trim();
+        if (!tr.dataset.id || tr.dataset.id === 'new'){
+          // create
+          try{
+            const res = await fetch('/auth/profiles/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ display_name: newName||null, prefs: null, extras: null }) });
+            if(!res.ok){ const t = await res.text(); const d = (JSON.parse(t)||{}); const m = (d && d.detail) || 'Create failed'; toast('error', m); return; }
+            const created = await res.json();
+            p = created;
+            tr.dataset.id = String(created.id);
+            nameView.textContent = created.display_name || ('#'+created.id);
+            setState('view');
+            window.dispatchEvent(new CustomEvent('profile:created',{detail:{profile:created}}));
+          }catch(e){ toast('error','Network error'); }
+        } else {
+          // update
+          try{
+            const res = await fetch('/auth/profiles/'+encodeURIComponent(tr.dataset.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ display_name: newName||null }) });
+            if(!res.ok){ const t = await res.text(); const d = (JSON.parse(t)||{}); const m = (d && d.detail) || 'Update failed'; toast('error', m); return; }
+            const updated = await res.json();
+            p = updated;
+            nameView.textContent = updated.display_name || ('#'+updated.id);
+            setState('view');
+            window.dispatchEvent(new CustomEvent('profile:updated',{detail:{profile:updated}}));
+          }catch(e){ toast('error','Network error'); }
+        }
+      }
+
+      btnEdit.addEventListener('click', function(){ setState('edit'); setTimeout(()=>{ try{ input.focus(); input.select(); }catch{} }, 0); });
+      btnSave.addEventListener('click', save);
+      input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); save(); } if(e.key==='Escape'){ e.preventDefault(); if (tr.dataset.id==='new'){ tr.remove(); checkEmpty(); } else { setState('view'); } } });
+
+      btnDel.addEventListener('click', async function(){
+        let ok = false;
+        try{ if (window.ArcadiaModal && ArcadiaModal.confirm){ ok = await ArcadiaModal.confirm('Delete profile?'); } else { ok = window.confirm('Delete profile?'); } }catch{}
+        if (!ok) return;
+        try{
+          const res = await fetch('/auth/profiles/'+encodeURIComponent(tr.dataset.id), { method:'DELETE' });
+          if(!res.ok){ toast('error','Delete failed'); return; }
+          tr.remove();
+          checkEmpty();
+          window.dispatchEvent(new CustomEvent('profile:deleted',{detail:{profile:p}}));
+        }catch(e){ toast('error','Network error'); }
+      });
+
+      setState(state);
+      return tr;
+    }
+
+    function checkEmpty(){ if (!tbody.children.length){ statusEl.textContent='No profiles yet.'; } }
+
     async function load(){
       try{
         const res = await fetch('/auth/profiles/');
-        if(!res.ok){ content.textContent = 'Not authenticated.'; return; }
+        if(!res.ok){ statusEl.textContent = 'Not authenticated.'; tbody.innerHTML=''; return; }
         const data = await res.json();
-        if(MULTI){ renderList(data); } else { const p = data[0]; content.textContent = p ? (p.display_name||'') : '(no profile)'; }
-      }catch(e){ content.textContent = 'Error loading.'; }
+        if (MULTI){ renderRows(data); } else { statusEl.textContent=''; tbody.innerHTML=''; if (data[0]) tbody.appendChild(renderRow(data[0],'view',0)); }
+      }catch(e){ statusEl.textContent = 'Error loading.'; tbody.innerHTML=''; }
     }
-    load();
-    const form = document.getElementById('add-profile');
-    if(form){
-      form.addEventListener('submit', async (e)=>{
-        e.preventDefault(); setMsg('');
-        const name = (document.getElementById('display_name').value||'').trim();
-        if(!name){ setMsg('Enter a name', false); return; }
-        try{
-          const res = await fetch('/auth/profiles/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ display_name: name, prefs: null, extras: null }) });
-          if(!res.ok){ const t = await res.text(); setMsg((JSON.parse(t).detail)||'Error creating', false); return; }
-          setMsg('Created', true); (document.getElementById('display_name').value=''); load();
-        }catch(e){ setMsg('Network error', false); }
+
+    if (newBtn){
+      newBtn.addEventListener('click', function(){
+        statusEl.textContent='';
+        const p = { id: 'new', display_name: '' };
+        const tr = renderRow(p, 'edit', tbody.children.length);
+        tr.dataset.id = 'new';
+        tbody.prepend(tr);
+        const input = tr.querySelector('.name-edit input');
+        setTimeout(()=>{ try{ input && input.focus(); }catch{} }, 0);
       });
     }
+
+    load();
   })();
   </script>
 </main>

@@ -33,3 +33,9 @@ Commit: b484e0f
 Change: F) Add AuthSettings.unique_profile_names (default False).
 Files: auth/arcadia_auth/router.py
 Commit: 9cdfb94
+ 
+2025-10-24
+
+Change: G) Always create a default profile on account registration; display_name falls back to email prefix when name is not provided.
+Files: auth/arcadia_auth/router.py
+Commit: 252c298

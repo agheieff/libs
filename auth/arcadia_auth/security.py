@@ -7,7 +7,18 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# Password hashing context: prefer argon2id when available, fallback to PBKDF2
+try:
+    pwd_context = CryptContext(schemes=["argon2", "pbkdf2_sha256"], deprecated="auto")
+except Exception:
+    # Environments without argon2 deps will still work with PBKDF2
+    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+
+def set_password_context(context: CryptContext) -> None:
+    """Allow applications to replace the CryptContext at runtime."""
+    global pwd_context
+    pwd_context = context
 
 
 def hash_password(password: str) -> str:

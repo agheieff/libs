@@ -2,7 +2,7 @@ from .schemas import (
     AccountCreate, AccountOut, LoginIn, TokenOut,
     ProfileCreate, ProfileOut,
 )
-from .security import hash_password, verify_password, create_access_token, decode_token
+from .security import hash_password, verify_password, create_access_token, decode_token, set_password_context, pwd_context
 from .repo import AuthRepository, InMemoryRepo, MutableAuthRepository
 from .sqlite_repo import SQLiteRepository, create_sqlite_repo
 from .models import Account, Profile, create_tables, create_sqlite_engine
@@ -13,7 +13,7 @@ from .policy import validate_password
 __all__ = [
     "AccountCreate", "AccountOut", "LoginIn", "TokenOut",
     "ProfileCreate", "ProfileOut",
-    "hash_password", "verify_password", "create_access_token", "decode_token",
+    "hash_password", "verify_password", "create_access_token", "decode_token", "set_password_context", "pwd_context",
     "AuthRepository", "InMemoryRepo", "MutableAuthRepository", "SQLiteRepository", "create_sqlite_repo",
     "Account", "Profile", "create_tables", "create_sqlite_engine",
     "create_auth_router", "AuthSettings", "validate_password",

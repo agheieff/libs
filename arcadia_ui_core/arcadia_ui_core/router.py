@@ -9,6 +9,7 @@ from starlette.templating import Jinja2Templates
 from jinja2 import TemplateNotFound
 import base64
 import json
+import html
 
 from .contextmenu import ContextMenuRegistry, ContextMenuRequest
 
@@ -109,6 +110,20 @@ def attach_ui(
 
 
 router = APIRouter()
+
+
+# Minimal helpers to escape text and attribute values
+def safe_attr(value: Any) -> str:
+    if value is None:
+        return ""
+    return html.escape(str(value), quote=True)
+
+
+def safe_label(text: Any) -> str:
+    if text is None:
+        return ""
+    # Text node content; escape HTML metacharacters
+    return html.escape(str(text), quote=False)
 
 
 def mount_templates_personal(templates):
@@ -360,7 +375,7 @@ def _build_context_menu_html(items: List[Dict[str, Any]], name: str) -> str:
         if it.get("divider"):
             out.append('<hr class="t-cm-divider" />')
             continue
-        label = it.get("label", "")
+        label = safe_label(it.get("label", ""))
         classes = ["t-cm-item"]
         if it.get("disabled"):
             classes.append("is-disabled")
@@ -370,31 +385,49 @@ def _build_context_menu_html(items: List[Dict[str, Any]], name: str) -> str:
 
         attrs: List[str] = [f'class="{cls}"', 'role="menuitem"']
         if it.get("id"):
-            attrs.append(f'id="{it["id"]}"')
+            attrs.append(f'id="{safe_attr(it["id"])}"')
         target = it.get("target")
         if target:
-            attrs.append(f'target="{target}"')
+            attrs.append(f'target="{safe_attr(target)}"')
 
         hx = it.get("hx") or {}
-        href = it.get("href")
+        href_raw = it.get("href")
+        # Only allow href starting with /, http:// or https:// (case-insensitive)
+        href: Optional[str] = None
+        if isinstance(href_raw, str):
+            _href_trim = href_raw.strip()
+            _href_low = _href_trim.lower()
+            if _href_trim.startswith("/") or _href_low.startswith("http://") or _href_low.startswith("https://"):
+                href = _href_trim
         disabled = bool(it.get("disabled"))
 
         if disabled:
             # Render as a non-interactive button (disabled)
-            out.append(f'<button {" ".join(attrs)} disabled>{label}</button>')
+            out.append(f'<button type="button" {" ".join(attrs)} disabled>{label}</button>')
         elif href:
             # Simple navigation
-            attrs.append(f'href="{href}"')
+            attrs.append(f'href="{safe_attr(href)}"')
+            # If opening in a new tab, ensure no opener leakage
+            if target == "_blank":
+                attrs.append('rel="noopener noreferrer"')
             out.append(f'<a {" ".join(attrs)}>{label}</a>')
         elif hx:
             # htmx action
+            _allowed = {"get", "post", "delete", "put", "patch", "confirm", "target", "swap"}
             for k, v in hx.items():
-                k2 = k.replace("_", "-")
-                attrs.append(f'hx-{k2}="{v}"')
-            out.append(f'<button {" ".join(attrs)}>{label}</button>')
+                ks = str(k).strip().lower()
+                if ks.startswith("hx-"):
+                    ks = ks[3:]
+                if ks.startswith("hx_"):
+                    ks = ks[3:]
+                ks = ks.replace("_", "-")
+                if ks not in _allowed:
+                    continue
+                attrs.append(f'hx-{ks}="{safe_attr(v)}"')
+            out.append(f'<button type="button" {" ".join(attrs)}>{label}</button>')
         else:
             # Fallback inert button
-            out.append(f'<button {" ".join(attrs)}>{label}</button>')
+            out.append(f'<button type="button" {" ".join(attrs)}>{label}</button>')
     out.append("</div>")
     return "".join(out)
 

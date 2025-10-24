@@ -19,6 +19,8 @@ class AuthSettings:
     algorithm: str = "HS256"
     access_expire_minutes: int = 60 * 24 * 7
     multi_profile: bool = True
+    # Profile options
+    unique_profile_names: bool = False
     # Password policy (optional)
     pwd_min_len: int = 8
     pwd_max_len: int = 256

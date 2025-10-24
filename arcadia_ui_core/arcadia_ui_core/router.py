@@ -79,6 +79,20 @@ def mount_templates(
         locale=locale,
     )
 
+    # Inject a minimal button helper returning class strings
+    def btn(variant: Optional[str] = None, *, primary: Optional[bool] = None) -> str:
+        classes = ["t-btn"]
+        v = (variant or "").strip()
+        if v:
+            classes.append(f"t-btn-{v}")
+        if primary:
+            # Avoid duplicate when variant already equals "primary"
+            if v != "primary":
+                classes.append("t-btn-primary")
+        return " ".join(classes)
+
+    templates.env.globals["btn"] = btn
+
     # Inject minimal i18n lookup as a Jinja global
     def t(key: str, default: Optional[str] = None) -> str:
         try:

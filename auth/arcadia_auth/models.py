@@ -42,7 +42,6 @@ class Account(Base):
         return {
             "id": self.id,
             "email": self.email,
-            "password_hash": self.password_hash,
             "is_active": self.is_active,
             "is_verified": self.is_verified,
             "role": self.role,

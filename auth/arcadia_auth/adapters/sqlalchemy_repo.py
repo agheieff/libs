@@ -49,12 +49,19 @@ class SQLAlchemyRepo(AuthRepository):
         return {
             "id": getattr(u, "id"),
             "email": getattr(u, self.uf_email),
-            "password_hash": getattr(u, self.uf_pwd),
             "is_active": bool(getattr(u, self.uf_active, True)),
             "is_verified": bool(getattr(u, self.uf_verified, True)),
             "role": (getattr(u, self.uf_role) if self.uf_role else None),
             "subscription_tier": (getattr(u, self.uf_sub) if self.uf_sub else None),
             "extras": None,
+        }
+
+    def _acc_to_credentials(self, u: Any) -> Dict[str, Any]:
+        return {
+            "id": getattr(u, "id"),
+            "password_hash": getattr(u, self.uf_pwd),
+            "is_active": bool(getattr(u, self.uf_active, True)),
+            "is_verified": bool(getattr(u, self.uf_verified, True)),
         }
 
     def _prof_to_dict(self, p: Any) -> Dict[str, Any]:
@@ -72,6 +79,14 @@ class SQLAlchemyRepo(AuthRepository):
         try:
             u = s.query(self.U).filter(getattr(self.U, self.uf_email) == email).first()
             return (self._acc_to_dict(u) if u else None)
+        finally:
+            s.close()
+
+    def get_account_credentials(self, email: str) -> Optional[Dict[str, Any]]:
+        s = self._sf()
+        try:
+            u = s.query(self.U).filter(getattr(self.U, self.uf_email) == email).first()
+            return (self._acc_to_credentials(u) if u else None)
         finally:
             s.close()
 

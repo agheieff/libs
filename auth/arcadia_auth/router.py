@@ -83,12 +83,12 @@ def create_auth_router(
     @r.post("/login", response_model=TokenOut)
     def login(payload: LoginIn):
         email = payload.email.strip().lower()
-        acc = repo.find_account_by_email(email)
-        if not acc or not verify_password(payload.password, acc.get("password_hash", "")):
+        creds = repo.get_account_credentials(email)
+        if not creds or not verify_password(payload.password, creds.get("password_hash", "")):
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        if not acc.get("is_active", True):
+        if not creds.get("is_active", True):
             raise HTTPException(status_code=403, detail="Inactive account")
-        token = create_access_token(acc["id"], settings.secret_key, settings.algorithm, settings.access_expire_minutes)
+        token = create_access_token(creds["id"], settings.secret_key, settings.algorithm, settings.access_expire_minutes)
         return TokenOut(access_token=token)
 
     @r.get("/logout")

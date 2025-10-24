@@ -14,6 +14,9 @@ class AuthRepository(ABC):
     def find_account_by_email(self, email: str) -> Optional[Dict[str, Any]]: ...
 
     @abstractmethod
+    def get_account_credentials(self, email: str) -> Optional[Dict[str, Any]]: ...
+
+    @abstractmethod
     def create_account(self, email: str, password_hash: str, *, name: Optional[str]) -> Dict[str, Any]: ...
 
     @abstractmethod
@@ -54,10 +57,29 @@ class InMemoryRepo(AuthRepository):
         self._prof_id += 1
         return self._prof_id
 
+    def _public_acc(self, acc: Dict[str, Any]) -> Dict[str, Any]:
+        # Return a sanitized copy without password_hash
+        out = {k: v for k, v in acc.items() if k != "password_hash"}
+        return out
+
     def find_account_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         key = email.strip().lower()
         acc_id = self.accounts_by_email.get(key)
-        return (self.accounts.get(acc_id) if acc_id else None)
+        acc = self.accounts.get(acc_id) if acc_id else None
+        return (self._public_acc(acc) if acc else None)
+
+    def get_account_credentials(self, email: str) -> Optional[Dict[str, Any]]:
+        key = email.strip().lower()
+        acc_id = self.accounts_by_email.get(key)
+        acc = self.accounts.get(acc_id) if acc_id else None
+        if not acc:
+            return None
+        return {
+            "id": acc["id"],
+            "password_hash": acc.get("password_hash", ""),
+            "is_active": bool(acc.get("is_active", True)),
+            "is_verified": bool(acc.get("is_verified", True)),
+        }
 
     def create_account(self, email: str, password_hash: str, *, name: Optional[str]) -> Dict[str, Any]:
         if self.find_account_by_email(email):
@@ -76,10 +98,11 @@ class InMemoryRepo(AuthRepository):
         self.accounts[aid] = acc
         self.accounts_by_email[acc["email"]] = aid
         self.profiles_by_acc[aid] = []
-        return acc
+        return self._public_acc(acc)
 
     def get_account_by_id(self, account_id: int) -> Optional[Dict[str, Any]]:
-        return self.accounts.get(int(account_id))
+        acc = self.accounts.get(int(account_id))
+        return (self._public_acc(acc) if acc else None)
 
     def list_profiles(self, account_id: int) -> list[Dict[str, Any]]:
         ids = self.profiles_by_acc.get(int(account_id), [])

@@ -32,6 +32,21 @@ class SQLiteRepository(AuthRepository):
                 Account.email.ilike(email.strip().lower())
             ).first()
             return account.to_dict() if account else None
+
+    def get_account_credentials(self, email: str) -> Optional[Dict[str, Any]]:
+        """Retrieve credentials-only view for login path"""
+        with self._get_session() as session:
+            account = session.query(Account).filter(
+                Account.email.ilike(email.strip().lower())
+            ).first()
+            if not account:
+                return None
+            return {
+                "id": account.id,
+                "password_hash": account.password_hash,
+                "is_active": bool(account.is_active),
+                "is_verified": bool(account.is_verified),
+            }
     
     def create_account(self, email: str, password_hash: str, *, name: Optional[str] = None, **extra_fields) -> Dict[str, Any]:
         """Create a new account with optional extended fields"""

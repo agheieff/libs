@@ -170,10 +170,6 @@ def ensure_templates(app_dir: str) -> str:
         from .theme import ThemeManager as NewThemeManager
         tm = NewThemeManager()
         theme_css.write_text(tm.generate_css(default="light"), encoding="utf-8")
-        
-        # Create theme selector JavaScript file
-        theme_js = sdir / "theme-selector.js"
-        theme_js.write_text(tm.generate_theme_selector_js(), encoding="utf-8")
     if not footer.exists():
         footer.write_text("""<footer style=\"margin-top:auto;padding:12px;border-top:1px solid #eee;color:#888\">© Arcadia</footer>\n""", encoding="utf-8")
     if not css.exists():

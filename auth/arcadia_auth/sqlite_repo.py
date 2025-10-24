@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session, sessionmaker
-from .repo import AuthRepository, MutableAuthRepository
+from .repo import MutableAuthRepository
 from .models import Account, Profile, create_sqlite_engine, create_tables
-from .security import hash_password
 
 
 class SQLiteRepository(MutableAuthRepository):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Optional, Type, Dict, Any
 from dataclasses import dataclass
-import re
 
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 

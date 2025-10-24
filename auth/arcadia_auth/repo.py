@@ -141,9 +141,12 @@ class InMemoryRepo(AuthRepository):
         return prof if prof and int(prof.get("account_id")) == int(account_id) else None
 
     def delete_profile(self, account_id: int, profile_id: int) -> None:
+        # Prevent deleting the last remaining profile
+        arr = list(self.profiles_by_acc.get(int(account_id), []))
+        if len(arr) <= 1:
+            return
         prof = self.get_profile(account_id, profile_id)
         if not prof:
             return
         self.profiles.pop(int(profile_id), None)
-        arr = self.profiles_by_acc.get(int(account_id), [])
         self.profiles_by_acc[int(account_id)] = [p for p in arr if int(p) != int(profile_id)]

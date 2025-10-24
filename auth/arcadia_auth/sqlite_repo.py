@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional, Dict, Any, List
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session, sessionmaker
 from .repo import MutableAuthRepository
 from .models import Account, Profile, create_sqlite_engine, create_tables
@@ -120,8 +121,17 @@ class SQLiteRepository(MutableAuthRepository):
             return profile.to_dict() if profile else None
     
     def delete_profile(self, account_id: str | int, profile_id: str | int) -> None:
-        """Delete a profile"""
+        """Delete a profile, but never allow deleting the last remaining profile for the account."""
         with self._get_session() as session:
+            # Optional: acquire a write lock early to reduce races (SQLite specific)
+            try:
+                session.execute(text("BEGIN IMMEDIATE"))
+            except Exception:
+                pass
+            total = session.query(func.count(Profile.id)).filter(Profile.account_id == int(account_id)).scalar() or 0
+            if total <= 1:
+                session.rollback()
+                return
             profile = session.query(Profile).filter(
                 Profile.account_id == int(account_id),
                 Profile.id == int(profile_id)

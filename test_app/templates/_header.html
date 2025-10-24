@@ -108,6 +108,20 @@
         });
       }
     }catch(e){}
+    // Also update label on rename of the active profile
+    try{
+      window.addEventListener('profile:updated', function(ev){
+        try{
+          var p = ev && ev.detail && ev.detail.profile;
+          if (!p || !window.ActiveProfile) return;
+          var ap = window.ActiveProfile.get && window.ActiveProfile.get();
+          if (ap && String(p.id) === String(ap)){
+            var btn = document.getElementById('tm-user-btn');
+            if (btn) btn.textContent = (p.display_name||'Account') + ' \u25BE';
+          }
+        }catch{}
+      });
+    }catch(e){}
     function fire(){
       try{ window.dispatchEvent(new CustomEvent('ui:reinit')); }catch(e){}
     }

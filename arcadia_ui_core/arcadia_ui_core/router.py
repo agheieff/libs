@@ -493,8 +493,8 @@ def _resolve_user_menu_items(user: Any, state: Optional[UIState]) -> List[Dict[s
             return list(items)
     # Defaults
     if user:
+        # Keep this neutral: apps can supply their own Profile entries.
         return [
-            {"label": "Profile", "href": "/profile"},
             {"label": "Account", "href": "/account"},
             {"label": "Settings", "href": "/settings"},
             {"divider": True},
@@ -625,65 +625,7 @@ def ui_context_menu(request: Request, name: str, path: Optional[str] = None, ele
     return HTMLResponse(html)
 
 
-@router.get("/ui/active-profile")
-def active_profile_get(request: Request):
-    state: Optional[UIState] = getattr(request.app.state, "ui", None)
-    if not state:
-        return Response(status_code=204)
-    apid = getattr(request.state, "active_profile_id", None)
-    if not apid:
-        return Response(status_code=204)
-    name: Optional[str] = None
-    try:
-        if state.profile_provider and getattr(request.state, "user", None) is not None:
-            profs = state.profile_provider(request, getattr(request.state, "user", None)) or []
-            for p in profs:
-                if str(p.get("id")) == str(apid):
-                    name = p.get("display_name")
-                    break
-    except Exception:
-        pass
-    return JSONResponse({"id": apid, "name": name})
-
-
-@router.post("/ui/active-profile")
-def active_profile_set(request: Request, payload: Dict[str, Any] = Body(...)):
-    state: Optional[UIState] = getattr(request.app.state, "ui", None)
-    if not state:
-        return Response(status_code=204)
-    user = getattr(request.state, "user", None)
-    if not user:
-        return Response(status_code=401)
-    apid = str(payload.get("id", "")).strip()
-    if not apid:
-        return Response(status_code=400)
-    valid = False
-    try:
-        if state.profile_validator:
-            valid = bool(state.profile_validator(request, user, apid))
-        elif state.profile_provider:
-            profs = state.profile_provider(request, user) or []
-            valid = any(str(p.get("id")) == str(apid) for p in profs)
-    except Exception:
-        valid = False
-    if not valid:
-        return Response(status_code=403)
-    try:
-        setattr(request.state, "active_profile_id", apid)
-    except Exception:
-        pass
-    resp = Response(status_code=204)
-    try:
-        resp.set_cookie(state.active_profile_cookie, apid, path="/", samesite="lax")
-    except Exception:
-        pass
-    return resp
-    user = getattr(request.state, "user", None)
-    ctx = {"request": request, "user_menu_items": _resolve_user_menu_items(user, state)}
-    try:
-        return state.templates.TemplateResponse("_user_menu.html", ctx)
-    except TemplateNotFound:
-        return HTMLResponse("", status_code=204)
+# Note: Active profile endpoints removed from default router to keep UI neutral.
 
 
 def create_ui_router(state: UIState) -> APIRouter:
@@ -748,99 +690,7 @@ def create_ui_router(state: UIState) -> APIRouter:
         except TemplateNotFound:
             return HTMLResponse("", status_code=204)
 
-    @r.get("/ui/active-profile")
-    def _active_profile_get(request: Request):
-        apid = getattr(request.state, "active_profile_id", None)
-        if not apid:
-            return Response(status_code=204)
-        name: Optional[str] = None
-        try:
-            if state.profile_provider and getattr(request.state, "user", None) is not None:
-                profs = state.profile_provider(request, getattr(request.state, "user", None)) or []
-                for p in profs:
-                    if str(p.get("id")) == str(apid):
-                        name = p.get("display_name")
-                        break
-        except Exception:
-            pass
-        return JSONResponse({"id": apid, "name": name})
-
-    @r.post("/ui/active-profile")
-    def _active_profile_set(request: Request, payload: Dict[str, Any] = Body(...)):
-        user = getattr(request.state, "user", None)
-        if not user:
-            return Response(status_code=401)
-        apid = str(payload.get("id", "")).strip()
-        if not apid:
-            return Response(status_code=400)
-        valid = False
-        try:
-            if state.profile_validator:
-                valid = bool(state.profile_validator(request, user, apid))
-            elif state.profile_provider:
-                profs = state.profile_provider(request, user) or []
-                valid = any(str(p.get("id")) == str(apid) for p in profs)
-        except Exception:
-            valid = False
-        if not valid:
-            return Response(status_code=403)
-        try:
-            setattr(request.state, "active_profile_id", apid)
-        except Exception:
-            pass
-        resp = Response(status_code=204)
-        try:
-            resp.set_cookie(state.active_profile_cookie, apid, path="/", samesite="lax")
-        except Exception:
-            pass
-        return resp
-
-    @r.get("/ui/active-profile")
-    def _active_profile_get(request: Request):
-        apid = getattr(request.state, "active_profile_id", None)
-        if not apid:
-            return Response(status_code=204)
-        name: Optional[str] = None
-        try:
-            if state.profile_provider and getattr(request.state, "user", None) is not None:
-                profs = state.profile_provider(request, getattr(request.state, "user", None)) or []
-                for p in profs:
-                    if str(p.get("id")) == str(apid):
-                        name = p.get("display_name")
-                        break
-        except Exception:
-            pass
-        return JSONResponse({"id": apid, "name": name})
-
-    @r.post("/ui/active-profile")
-    def _active_profile_set(request: Request, payload: Dict[str, Any] = Body(...)):
-        user = getattr(request.state, "user", None)
-        if not user:
-            return Response(status_code=401)
-        apid = str(payload.get("id", "")).strip()
-        if not apid:
-            return Response(status_code=400)
-        valid = False
-        try:
-            if state.profile_validator:
-                valid = bool(state.profile_validator(request, user, apid))
-            elif state.profile_provider:
-                profs = state.profile_provider(request, user) or []
-                valid = any(str(p.get("id")) == str(apid) for p in profs)
-        except Exception:
-            valid = False
-        if not valid:
-            return Response(status_code=403)
-        try:
-            setattr(request.state, "active_profile_id", apid)
-        except Exception:
-            pass
-        resp = Response(status_code=204)
-        try:
-            resp.set_cookie(state.active_profile_cookie, apid, path="/", samesite="lax")
-        except Exception:
-            pass
-        return resp
+    
 
     @r.get("/ui/context-menu", response_class=HTMLResponse)
     def _context_menu(request: Request, name: str, path: Optional[str] = None, element_id: Optional[str] = None):

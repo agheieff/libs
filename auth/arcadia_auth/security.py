@@ -7,12 +7,29 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 
 
+def _argon2_available() -> bool:
+    try:
+        # Prefer passlib's detection; returns False if backend missing
+        from passlib.handlers.argon2 import argon2  # type: ignore
+
+        try:
+            return bool(getattr(argon2, "has_backend", lambda: False)())
+        except Exception:
+            return False
+    except Exception:
+        return False
+
+
+def _build_pwd_context() -> CryptContext:
+    if _argon2_available():
+        # Use argon2 when the backend is present; PBKDF2 for legacy hashes
+        return CryptContext(schemes=["argon2", "pbkdf2_sha256"], default="argon2", deprecated="auto")
+    # Fallback: only PBKDF2 to avoid runtime MissingBackendError
+    return CryptContext(schemes=["pbkdf2_sha256"], default="pbkdf2_sha256", deprecated="auto")
+
+
 # Password hashing context: prefer argon2id when available, fallback to PBKDF2
-try:
-    pwd_context = CryptContext(schemes=["argon2", "pbkdf2_sha256"], deprecated="auto")
-except Exception:
-    # Environments without argon2 deps will still work with PBKDF2
-    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = _build_pwd_context()
 
 
 def set_password_context(context: CryptContext) -> None:

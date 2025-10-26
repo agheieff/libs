@@ -4,24 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log in - Arcadia</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .auth-wrap{max-width:420px;margin:48px auto;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px}
+      .auth-title{font-size:20px;font-weight:600;margin:0 0 12px;color:var(--fg)}
+      .auth-label{font-size:13px;margin:8px 0 4px;color:var(--muted)}
+      .auth-input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg)}
+      .auth-btn{width:100%;padding:10px 12px;border-radius:6px}
+      .auth-error{font-size:13px;color:#b91c1c;display:none;margin-top:8px}
+      body{background:var(--bg)}
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen" style="margin:0;">
     {% include "_header.html" ignore missing %}
     <div id="arcadia-content">
-    <div class="max-w-md mx-auto mt-12 bg-white shadow p-6 rounded">
-        <h1 class="text-2xl font-semibold mb-4">Log in</h1>
+    <div class="auth-wrap">
+        <h1 class="auth-title">Log in</h1>
         <form id="login-form" class="space-y-4" onsubmit="return false;">
             <div>
-                <label class="block text-sm mb-1">Email</label>
-                <input id="email" type="email" class="w-full border rounded p-2" required />
+                <div class="auth-label">Email</div>
+                <input id="email" type="email" class="auth-input" required />
             </div>
             <div>
-                <label class="block text-sm mb-1">Password</label>
-                <input id="password" type="password" class="w-full border rounded p-2" required />
+                <div class="auth-label">Password</div>
+                <input id="password" type="password" class="auth-input" required />
             </div>
-            <button id="login-btn" class="w-full bg-blue-600 text-white py-2 rounded">Log in</button>
-            <p id="login-error" class="text-sm text-red-600 mt-2" style="display:none;"></p>
+            <button id="login-btn" class="t-btn t-btn-primary auth-btn">Log in</button>
+            <p id="login-error" class="auth-error"></p>
         </form>
     </div>
     <script>

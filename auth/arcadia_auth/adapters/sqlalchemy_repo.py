@@ -66,14 +66,6 @@ class SQLAlchemyRepo(AuthRepository):
             "is_verified": bool(getattr(u, self.uf_verified, True)),
         }
 
-    def _prof_to_dict(self, p: Any) -> Dict[str, Any]:
-        return {
-            "id": getattr(p, "id"),
-            "account_id": getattr(p, self.pf_acc),
-            "display_name": (getattr(p, self.pf_name) if self.pf_name else None),
-            "prefs": (getattr(p, self.pf_prefs) if self.pf_prefs else None),
-            "extras": (getattr(p, self.pf_extras) if self.pf_extras else None),
-        }
 
     # ---- repo API ----
     def find_account_by_email(self, email: str) -> Optional[Dict[str, Any]]:
@@ -102,7 +94,7 @@ class SQLAlchemyRepo(AuthRepository):
         finally:
             s.close()
 
-    def create_account(self, email: str, password_hash: str, *, name: Optional[str]) -> Dict[str, Any]:
+    def create_account(self, email: str, password_hash: str) -> Dict[str, Any]:
         s = self._sf()
         try:
             u = self.U()
@@ -112,9 +104,6 @@ class SQLAlchemyRepo(AuthRepository):
                 setattr(u, self.uf_active, True)
             if hasattr(u, self.uf_verified):
                 setattr(u, self.uf_verified, True)
-            # best-effort: if model has a 'name' field, set it
-            if name and hasattr(u, "name"):
-                setattr(u, "name", name)
             s.add(u)
             s.commit()
             s.refresh(u)
@@ -130,49 +119,4 @@ class SQLAlchemyRepo(AuthRepository):
         finally:
             s.close()
 
-    def list_profiles(self, account_id: str | int) -> list[Dict[str, Any]]:
-        s = self._sf()
-        try:
-            rows = s.query(self.P).filter(getattr(self.P, self.pf_acc) == account_id).all()
-            return [self._prof_to_dict(p) for p in rows]
-        finally:
-            s.close()
-
-    def create_profile(self, account_id: str | int, *, display_name: Optional[str], prefs: Optional[Dict[str, Any]], extras: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        s = self._sf()
-        try:
-            p = self.P()
-            setattr(p, self.pf_acc, account_id)
-            if self.pf_name and hasattr(p, self.pf_name):
-                setattr(p, self.pf_name, display_name)
-            if self.pf_prefs and hasattr(p, self.pf_prefs):
-                setattr(p, self.pf_prefs, prefs)
-            if self.pf_extras and hasattr(p, self.pf_extras):
-                setattr(p, self.pf_extras, extras)
-            s.add(p)
-            s.commit()
-            s.refresh(p)
-            return self._prof_to_dict(p)
-        finally:
-            s.close()
-
-    def get_profile(self, account_id: str | int, profile_id: str | int) -> Optional[Dict[str, Any]]:
-        s = self._sf()
-        try:
-            p = s.get(self.P, profile_id)
-            if not p or getattr(p, self.pf_acc) != account_id:
-                return None
-            return self._prof_to_dict(p)
-        finally:
-            s.close()
-
-    def delete_profile(self, account_id: str | int, profile_id: str | int) -> None:
-        s = self._sf()
-        try:
-            p = s.get(self.P, profile_id)
-            if not p or getattr(p, self.pf_acc) != account_id:
-                return
-            s.delete(p)
-            s.commit()
-        finally:
-            s.close()
+    # Profile management has been removed - applications should implement their own profile systems

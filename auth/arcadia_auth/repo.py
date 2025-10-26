@@ -17,22 +17,10 @@ class AuthRepository(ABC):
     def get_account_credentials(self, email: str) -> Optional[Dict[str, Any]]: ...
 
     @abstractmethod
-    def create_account(self, email: str, password_hash: str, *, name: Optional[str]) -> Dict[str, Any]: ...
+    def create_account(self, email: str, password_hash: str) -> Dict[str, Any]: ...
 
     @abstractmethod
     def get_account_by_id(self, account_id: str | int) -> Optional[Dict[str, Any]]: ...
-
-    @abstractmethod
-    def list_profiles(self, account_id: str | int) -> list[Dict[str, Any]]: ...
-
-    @abstractmethod
-    def create_profile(self, account_id: str | int, *, display_name: Optional[str], prefs: Optional[Dict[str, Any]], extras: Optional[Dict[str, Any]]) -> Dict[str, Any]: ...
-
-    @abstractmethod
-    def get_profile(self, account_id: str | int, profile_id: str | int) -> Optional[Dict[str, Any]]: ...
-
-    @abstractmethod
-    def delete_profile(self, account_id: str | int, profile_id: str | int) -> None: ...
 
 
 class MutableAuthRepository(AuthRepository, ABC):
@@ -45,9 +33,6 @@ class MutableAuthRepository(AuthRepository, ABC):
     @abstractmethod
     def update_account(self, account_id: str | int, **updates) -> Optional[Dict[str, Any]]: ...
 
-    @abstractmethod
-    def update_profile(self, account_id: str | int, profile_id: str | int, **updates) -> Optional[Dict[str, Any]]: ...
-
 
 class InMemoryRepo(AuthRepository):
     """Simple in-memory store for testing.
@@ -57,19 +42,12 @@ class InMemoryRepo(AuthRepository):
 
     def __init__(self) -> None:
         self._acc_id = 0
-        self._prof_id = 0
         self.accounts: Dict[int, Dict[str, Any]] = {}
         self.accounts_by_email: Dict[str, int] = {}
-        self.profiles: Dict[int, Dict[str, Any]] = {}
-        self.profiles_by_acc: Dict[int, list[int]] = {}
 
     def _next_acc(self) -> int:
         self._acc_id += 1
         return self._acc_id
-
-    def _next_prof(self) -> int:
-        self._prof_id += 1
-        return self._prof_id
 
     def _public_acc(self, acc: Dict[str, Any]) -> Dict[str, Any]:
         # Return a sanitized copy without password_hash
@@ -95,7 +73,7 @@ class InMemoryRepo(AuthRepository):
             "is_verified": bool(acc.get("is_verified", True)),
         }
 
-    def create_account(self, email: str, password_hash: str, *, name: Optional[str]) -> Dict[str, Any]:
+    def create_account(self, email: str, password_hash: str) -> Dict[str, Any]:
         if self.find_account_by_email(email):
             raise ValueError("email already registered")
         aid = self._next_acc()
@@ -107,46 +85,12 @@ class InMemoryRepo(AuthRepository):
             "is_verified": True,
             "role": None,
             "subscription_tier": None,
-            "name": name,
-            "extras": {"name": name} if name else None,
+            "extras": None,
         }
         self.accounts[aid] = acc
         self.accounts_by_email[acc["email"]] = aid
-        self.profiles_by_acc[aid] = []
         return self._public_acc(acc)
 
     def get_account_by_id(self, account_id: int) -> Optional[Dict[str, Any]]:
         acc = self.accounts.get(int(account_id))
         return (self._public_acc(acc) if acc else None)
-
-    def list_profiles(self, account_id: int) -> list[Dict[str, Any]]:
-        ids = self.profiles_by_acc.get(int(account_id), [])
-        return [self.profiles[i] for i in ids]
-
-    def create_profile(self, account_id: int, *, display_name: Optional[str], prefs: Optional[Dict[str, Any]], extras: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        pid = self._next_prof()
-        prof = {
-            "id": pid,
-            "account_id": int(account_id),
-            "display_name": display_name,
-            "prefs": prefs,
-            "extras": extras,
-        }
-        self.profiles[pid] = prof
-        self.profiles_by_acc.setdefault(int(account_id), []).append(pid)
-        return prof
-
-    def get_profile(self, account_id: int, profile_id: int) -> Optional[Dict[str, Any]]:
-        prof = self.profiles.get(int(profile_id))
-        return prof if prof and int(prof.get("account_id")) == int(account_id) else None
-
-    def delete_profile(self, account_id: int, profile_id: int) -> None:
-        # Prevent deleting the last remaining profile
-        arr = list(self.profiles_by_acc.get(int(account_id), []))
-        if len(arr) <= 1:
-            return
-        prof = self.get_profile(account_id, profile_id)
-        if not prof:
-            return
-        self.profiles.pop(int(profile_id), None)
-        self.profiles_by_acc[int(account_id)] = [p for p in arr if int(p) != int(profile_id)]

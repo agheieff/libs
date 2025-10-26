@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "arcadia-auth"
 version = "0.1.0"
-description = "Minimal shared auth library (JWT bearer, Account/Profile)"
+description = "Minimal shared auth library (JWT bearer, Account)"
 requires-python = ">=3.8"
 dependencies = [
   "fastapi>=0.110",
